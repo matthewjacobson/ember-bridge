@@ -1,0 +1,454 @@
+/* Ember Bridge — application styles. Dark, calm, utilitarian. */
+
+:root {
+  --bg: #16161c;
+  --bg-raised: #1e1e26;
+  --bg-hover: #26262f;
+  --border: #32323e;
+  --text: #e8e6e3;
+  --text-dim: #9a97a3;
+  --accent: #f0803c; /* ember */
+  --accent-soft: rgba(240, 128, 60, 0.15);
+  --ok: #5cbf7c;
+  --warn: #d9a441;
+  --err: #e06060;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+#root,
+.shell {
+  height: 100vh;
+}
+
+/* ---- layout ------------------------------------------------------------ */
+
+.shell {
+  display: flex;
+}
+
+.sidebar {
+  width: 190px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 10px;
+  background: var(--bg-raised);
+  border-right: 1px solid var(--border);
+}
+
+.brand {
+  font-weight: 600;
+  padding: 6px 10px 16px;
+  letter-spacing: 0.02em;
+}
+
+.brand-mark {
+  color: var(--accent);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.nav-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.badge {
+  margin-left: auto;
+  background: var(--accent);
+  color: #1a1208;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.dot-ok { background: var(--ok); }
+.dot-err { background: var(--err); }
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.page {
+  padding: 20px 24px 40px;
+  max-width: 760px;
+}
+
+.page-logs {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+}
+
+/* ---- sections ----------------------------------------------------------- */
+
+.section {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.section-header h2 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+/* ---- controls ----------------------------------------------------------- */
+
+button {
+  font: inherit;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--text-dim);
+}
+
+button:disabled {
+  opacity: 0.45;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a1208;
+  font-weight: 600;
+}
+
+button.danger:hover:not(:disabled) {
+  border-color: var(--err);
+  color: var(--err);
+}
+
+input,
+textarea {
+  font: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 7px 10px;
+  user-select: text;
+}
+
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.inline-form {
+  display: flex;
+  gap: 8px;
+}
+
+.inline-form input:first-child {
+  width: 220px;
+}
+
+/* ---- machines ----------------------------------------------------------- */
+
+.machine-list,
+.job-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.machine-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.machine-row:hover {
+  background: var(--bg-hover);
+}
+
+.machine-row.selected {
+  background: var(--accent-soft);
+}
+
+.machine-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text);
+  text-align: left;
+}
+
+.machine-name {
+  font-weight: 500;
+}
+
+.machine-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ---- send / jobs --------------------------------------------------------- */
+
+.target-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.storage-line {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.file-list {
+  margin: 8px 0 0;
+}
+
+.send-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.job-row {
+  padding: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.job-row:first-child {
+  border-top: none;
+}
+
+.job-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.job-name {
+  font-weight: 500;
+}
+
+.job-time {
+  margin-left: auto;
+}
+
+.job-error {
+  color: var(--err);
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+
+.progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg);
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+/* ---- pills, notes, misc -------------------------------------------------- */
+
+.pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+
+.pill-ok { background: rgba(92, 191, 124, 0.15); color: var(--ok); }
+.pill-warn { background: rgba(217, 164, 65, 0.15); color: var(--warn); }
+.pill-err { background: rgba(224, 96, 96, 0.15); color: var(--err); }
+.pill-muted { background: var(--bg-hover); color: var(--text-dim); }
+
+.dim {
+  color: var(--text-dim);
+}
+
+.empty-state {
+  color: var(--text-dim);
+  padding: 14px 0;
+}
+
+.error-note {
+  background: rgba(224, 96, 96, 0.12);
+  border: 1px solid rgba(224, 96, 96, 0.4);
+  color: var(--err);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 6px 12px;
+  margin: 0;
+}
+
+.kv dt {
+  color: var(--text-dim);
+}
+
+.kv dd {
+  margin: 0;
+  user-select: text;
+}
+
+.token-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.token {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  flex: 1;
+  overflow-x: auto;
+  white-space: nowrap;
+  user-select: text;
+}
+
+/* ---- logs ---------------------------------------------------------------- */
+
+.log-view {
+  flex: 1;
+  overflow-y: auto;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  padding: 4px;
+  user-select: text;
+}
+
+.log-entry {
+  display: flex;
+  gap: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.log-entry:hover {
+  background: var(--bg-raised);
+}
+
+.log-time {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.log-level {
+  width: 42px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  font-size: 10px;
+  padding-top: 2px;
+}
+
+.log-info .log-level { color: var(--text-dim); }
+.log-warn .log-level { color: var(--warn); }
+.log-error .log-level { color: var(--err); }
+.log-error .log-message { color: var(--err); }
+
+/* ---- boot error ----------------------------------------------------------- */
+
+.boot-error {
+  padding: 40px;
+}
