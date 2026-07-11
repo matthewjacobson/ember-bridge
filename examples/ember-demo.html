@@ -1,0 +1,389 @@
+<!doctype html>
+<!--
+  Ember Bridge integration demo
+  =============================
+
+  A single-file example of how a web app like Ember talks to the Ember
+  Bridge desktop app running on the user's machine (http://127.0.0.1:17831).
+
+  Run it:
+
+      cd examples
+      python3 -m http.server 8000
+      open http://localhost:8000/ember-demo.html
+
+  Localhost origins are always allowed by the bridge's CORS policy, so the
+  demo works out of the box. A real deployment (e.g. https://ember.app) must
+  be added to the allowlist first: Ember Bridge > Settings > Allowed origins
+  (or PUT /api/settings). The API token is required either way.
+
+  The integration flow demonstrated below:
+
+    1. DETECT  — poll GET /api/health (the only endpoint that needs no token)
+                 to see whether the bridge is installed and running.
+    2. PAIR    — the user copies the API token from the bridge's Settings
+                 page into the site once; verify it with GET /api/status.
+    3. TARGET  — list saved machines (GET /api/machines) and offer a network
+                 scan (POST /api/discover).
+    4. SEND    — POST the raw design bytes to /api/send?ip=...&filename=...
+                 The bridge validates format/size and queues the upload.
+    5. TRACK   — poll GET /api/jobs/{id} until state is "done" or "failed".
+
+  All error responses share one shape: { "error": { "code", "message" } }.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ember × Ember Bridge — integration demo</title>
+<style>
+  :root {
+    --bg: #16161c; --raised: #1e1e26; --border: #32323e;
+    --text: #e8e6e3; --dim: #9a97a3; --accent: #f0803c;
+    --ok: #5cbf7c; --err: #e06060;
+  }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  main { max-width: 680px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-size: 22px; } h1 .mark { color: var(--accent); }
+  p.lede { color: var(--dim); margin-bottom: 32px; }
+
+  .step {
+    background: var(--raised); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 20px; margin-bottom: 16px;
+    opacity: 0.45; transition: opacity 0.3s;
+  }
+  .step.active, .step.done { opacity: 1; }
+  .step h2 { font-size: 15px; margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+  .step h2 .n {
+    background: var(--border); border-radius: 50%; width: 24px; height: 24px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; flex-shrink: 0;
+  }
+  .step.done h2 .n { background: var(--ok); color: #10241a; }
+  .step .body { margin-left: 34px; }
+  .hint { color: var(--dim); font-size: 13px; margin: 4px 0 10px; }
+
+  button {
+    font: inherit; padding: 7px 14px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--border); background: #26262f; color: var(--text);
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #1a1208; font-weight: 600; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  input[type="text"], input[type="password"] {
+    font: inherit; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; width: 320px;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  .status { font-size: 13px; margin-top: 8px; }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--err); }
+
+  .machine {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    text-align: left; padding: 10px 12px; margin-top: 8px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  }
+  .machine.selected { border-color: var(--accent); }
+  .machine .name { font-weight: 600; }
+  .machine .meta { color: var(--dim); font-size: 13px; margin-left: auto; }
+
+  progress { width: 100%; height: 8px; accent-color: var(--accent); margin-top: 10px; }
+  code { background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+         padding: 1px 5px; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1><span class="mark">✦</span> Ember <span style="color:var(--dim)">×</span> Ember Bridge</h1>
+  <p class="lede">
+    This page plays the role of the Ember editor: it finds the locally
+    running Ember Bridge app, pairs with it, and sends an embroidery design
+    to a machine on your WiFi. View source — every step is commented.
+  </p>
+
+  <section class="step" id="step-detect">
+    <h2><span class="n">1</span> Detect the bridge</h2>
+    <div class="body">
+      <p class="hint">Polling <code>GET /api/health</code> — no token needed, so a site
+      can tell "installed and running" apart from "needs install" before pairing.</p>
+      <div class="status" id="detect-status">Looking for Ember Bridge on 127.0.0.1:17831…</div>
+    </div>
+  </section>
+
+  <section class="step" id="step-pair">
+    <h2><span class="n">2</span> Pair with a token</h2>
+    <div class="body">
+      <p class="hint">In Ember Bridge, open <strong>Settings</strong> and copy the API token.
+      Ember would store this once and reuse it forever.</p>
+      <div class="row">
+        <input type="password" id="token" placeholder="paste API token" autocomplete="off" />
+        <button class="primary" id="pair-btn">Pair</button>
+      </div>
+      <div class="status" id="pair-status"></div>
+    </div>
+  </section>
+
+  <section class="step" id="step-target">
+    <h2><span class="n">3</span> Choose a machine</h2>
+    <div class="body">
+      <p class="hint"><code>GET /api/machines</code> returns machines the user saved in the
+      bridge plus the latest scan results; <code>POST /api/discover</code> sweeps the local
+      network (takes a few seconds).</p>
+      <div class="row">
+        <button id="refresh-btn">Refresh list</button>
+        <button id="discover-btn">Scan network</button>
+      </div>
+      <div id="machines"></div>
+      <div class="status" id="target-status"></div>
+    </div>
+  </section>
+
+  <section class="step" id="step-send">
+    <h2><span class="n">4</span> Send a design</h2>
+    <div class="body">
+      <p class="hint">The design bytes go straight in the request body:
+      <code>POST /api/send?ip=…&amp;filename=…</code>. The bridge answers
+      <code>202</code> with a job, then uploads in the background while we poll
+      <code>GET /api/jobs/{id}</code>.</p>
+      <div class="row">
+        <input type="file" id="file" accept=".pes,.phc,.phx,.dst" />
+        <button class="primary" id="send-btn" disabled>Send to machine</button>
+      </div>
+      <progress id="job-progress" max="1" value="0" hidden></progress>
+      <div class="status" id="send-status"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+/* ------------------------------------------------------------------------
+ * The client. In Ember this would be a small module; everything the site
+ * needs is: the fixed base URL, the user's token, and fetch().
+ * ---------------------------------------------------------------------- */
+
+const BRIDGE_URL = "http://127.0.0.1:17831";
+
+class BridgeClient {
+  constructor(token) { this.token = token; }
+
+  async request(method, path, body, contentType) {
+    let response;
+    try {
+      response = await fetch(BRIDGE_URL + path, {
+        method,
+        headers: {
+          // X-Ember-Token also works; Bearer is the documented form.
+          Authorization: `Bearer ${this.token}`,
+          ...(contentType ? { "Content-Type": contentType } : {}),
+        },
+        body,
+      });
+    } catch {
+      // fetch() rejecting means the bridge isn't reachable at all
+      // (quit, or this page's origin isn't on the CORS allowlist).
+      throw new BridgeError("unreachable", "Ember Bridge is not reachable");
+    }
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      // Every error is { error: { code, message } } with a stable code —
+      // Ember can branch on codes like `file_too_large` or `unauthorized`.
+      const e = json.error ?? {};
+      throw new BridgeError(e.code ?? "unknown", e.message ?? response.statusText);
+    }
+    return json;
+  }
+
+  get(path)        { return this.request("GET", path); }
+  post(path, body, type) { return this.request("POST", path, body, type); }
+
+  /** Sends raw design bytes; returns the queued job record. */
+  async send(ip, filename, bytes) {
+    const q = `ip=${encodeURIComponent(ip)}&filename=${encodeURIComponent(filename)}`;
+    const { job } = await this.post(`/api/send?${q}`, bytes, "application/octet-stream");
+    return job;
+  }
+}
+
+class BridgeError extends Error {
+  constructor(code, message) { super(message); this.code = code; }
+}
+
+/** Installed-and-running check — the only call that works without a token. */
+async function detectBridge() {
+  try {
+    const r = await fetch(`${BRIDGE_URL}/api/health`);
+    const health = await r.json();
+    return health.app === "ember-bridge" ? health : null;
+  } catch {
+    return null; // not installed, not running, or blocked
+  }
+}
+
+/* ------------------------------------------------------------------------
+ * Demo UI wiring. Ember's real UI would differ; the API calls would not.
+ * ---------------------------------------------------------------------- */
+
+const $ = (id) => document.getElementById(id);
+let client = null;        // set after pairing
+let selectedIp = null;    // set in step 3
+
+function setStep(id, state) {           // "active" | "done" | ""
+  $(id).className = `step ${state}`;
+}
+function setStatus(id, text, kind = "") {
+  const el = $(id);
+  el.textContent = text;
+  el.className = `status ${kind}`;
+}
+
+/* Step 1 — poll /api/health until the bridge shows up. */
+setStep("step-detect", "active");
+(async function pollHealth() {
+  const health = await detectBridge();
+  if (health) {
+    setStatus("detect-status",
+      `Found Ember Bridge v${health.version} on port ${health.port}.`, "ok");
+    setStep("step-detect", "done");
+    setStep("step-pair", "active");
+    // A real site keeps polling in the background to notice the app
+    // quitting; the demo keeps it simple and moves on.
+  } else {
+    setStatus("detect-status",
+      "Not found — start the Ember Bridge app, then this will connect automatically.", "err");
+    setTimeout(pollHealth, 2000);
+  }
+})();
+
+/* Step 2 — verify the pasted token with an authenticated call. */
+$("pair-btn").addEventListener("click", async () => {
+  const candidate = new BridgeClient($("token").value.trim());
+  try {
+    await candidate.get("/api/status");
+  } catch (e) {
+    setStatus("pair-status",
+      e.code === "unauthorized" ? "That token was rejected — copy it from Settings in Ember Bridge."
+                                : `Could not verify: ${e.message}`, "err");
+    return;
+  }
+  client = candidate;
+  setStatus("pair-status", "Paired. Ember would persist this token now.", "ok");
+  setStep("step-pair", "done");
+  setStep("step-target", "active");
+  loadMachines();
+});
+
+/* Step 3 — saved machines + discovery. */
+async function loadMachines() {
+  const { saved, discovered } = await client.get("/api/machines");
+  // Merge by IP: saved entries carry the user's nickname, discovered ones
+  // carry live identity (model, firmware) from the scan.
+  const byIp = new Map();
+  for (const m of discovered) {
+    byIp.set(m.info.identity.ip, {
+      ip: m.info.identity.ip,
+      label: m.info.identity.name ?? m.info.identity.model,
+      meta: `${m.info.identity.manufacturer} · discovered`,
+    });
+  }
+  for (const m of saved) {
+    byIp.set(m.ip, {
+      ip: m.ip,
+      label: m.nickname ?? byIp.get(m.ip)?.label ?? m.ip,
+      meta: `${m.manufacturer ?? "saved"} · ${m.ip}`,
+    });
+  }
+
+  const list = $("machines");
+  list.innerHTML = "";
+  if (byIp.size === 0) {
+    setStatus("target-status", "No machines yet — try a network scan.", "");
+    return;
+  }
+  setStatus("target-status", "");
+  for (const m of byIp.values()) {
+    const btn = document.createElement("button");
+    btn.className = "machine";
+    btn.innerHTML = `<span class="name"></span><span class="meta"></span>`;
+    btn.querySelector(".name").textContent = m.label;
+    btn.querySelector(".meta").textContent = m.meta;
+    btn.addEventListener("click", () => {
+      selectedIp = m.ip;
+      list.querySelectorAll(".machine").forEach((b) => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      setStep("step-target", "done");
+      setStep("step-send", "active");
+      $("send-btn").disabled = !$("file").files.length;
+    });
+    list.appendChild(btn);
+  }
+}
+
+$("refresh-btn").addEventListener("click", () => loadMachines().catch(showTargetError));
+$("discover-btn").addEventListener("click", async () => {
+  setStatus("target-status", "Scanning the local network (a few seconds)…");
+  $("discover-btn").disabled = true;
+  try {
+    await client.post("/api/discover");   // blocks until the sweep finishes
+    await loadMachines();
+  } catch (e) {
+    showTargetError(e);
+  } finally {
+    $("discover-btn").disabled = false;
+  }
+});
+function showTargetError(e) { setStatus("target-status", e.message, "err"); }
+
+/* Step 4 — send the file, then poll the job to completion. */
+$("file").addEventListener("change", () => {
+  $("send-btn").disabled = !$("file").files.length || !selectedIp;
+});
+
+$("send-btn").addEventListener("click", async () => {
+  const file = $("file").files[0];
+  $("send-btn").disabled = true;
+  $("job-progress").hidden = false;
+  $("job-progress").value = 0;
+
+  try {
+    const bytes = await file.arrayBuffer();
+    const job = await client.send(selectedIp, file.name, bytes);
+    setStatus("send-status", `Queued as job ${job.id}…`);
+
+    // Poll until terminal. The job carries sentBytes/totalBytes while
+    // uploading and storedAs (the machine-assigned name) when done.
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 500));
+      const { job: j } = await client.get(`/api/jobs/${job.id}`);
+      if (j.state === "uploading" && j.totalBytes > 0) {
+        $("job-progress").value = j.sentBytes / j.totalBytes;
+        setStatus("send-status", `Uploading… ${j.sentBytes} / ${j.totalBytes} bytes`);
+      } else if (j.state === "done") {
+        $("job-progress").value = 1;
+        setStatus("send-status",
+          `Done — the machine stored it as ${j.storedAs ?? j.filename}. ` +
+          "Load it from the machine's memory to stitch.", "ok");
+        setStep("step-send", "done");
+        break;
+      } else if (j.state === "failed") {
+        // j.errorCode is stable (e.g. "file_too_large", "insufficient_storage",
+        // "unreachable") — a real UI maps codes to friendlier guidance.
+        setStatus("send-status", `Failed (${j.errorCode}): ${j.error}`, "err");
+        break;
+      }
+    }
+  } catch (e) {
+    setStatus("send-status", `${e.message} (${e.code})`, "err");
+  } finally {
+    $("send-btn").disabled = false;
+  }
+});
+</script>
+</body>
+</html>
