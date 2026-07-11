@@ -379,3 +379,275 @@ async fn settings_roundtrip_updates_allowed_origins() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     assert_eq!(body_json(response).await["error"]["code"], "invalid_origin");
 }
+
+// ---------------------------------------------------------------------------
+// Pairing
+
+/// Full happy path: browser asks, desktop approves, token released once.
+#[tokio::test]
+async fn pairing_approve_flow() {
+    let app = test_app().await;
+    let origin = "http://localhost:5173";
+
+    // Browser creates a request — no token, JSON body with a display name.
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::post("/api/pair")
+                .header(header::ORIGIN, origin)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(r#"{"appName":"Ember"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+    let json = body_json(response).await;
+    let id = json["request"]["id"].as_str().unwrap().to_string();
+    assert_eq!(json["request"]["origin"], origin);
+    assert_eq!(json["request"]["appName"], "Ember");
+
+    // While pending, the browser polls…
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::get(format!("/api/pair/{id}"))
+                .header(header::ORIGIN, origin)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(body_json(response).await["state"], "pending");
+
+    // …the desktop UI sees it (token-gated route)…
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::get("/api/pairing")
+                .header(header::AUTHORIZATION, format!("Bearer {}", app.token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let json = body_json(response).await;
+    assert_eq!(json["pending"]["id"], id.as_str());
+    assert_eq!(json["pending"]["origin"], origin);
+
+    // …and approves it.
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::post("/api/pairing/respond")
+                .header(header::AUTHORIZATION, format!("Bearer {}", app.token))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(format!(r#"{{"id":"{id}","approve":true}}"#)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // The next browser poll receives the real token…
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::get(format!("/api/pair/{id}"))
+                .header(header::ORIGIN, origin)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let json = body_json(response).await;
+    assert_eq!(json["state"], "approved");
+    assert_eq!(json["token"], app.token.as_str());
+
+    // …exactly once.
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::get(format!("/api/pair/{id}"))
+                .header(header::ORIGIN, origin)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn pairing_deny_flow() {
+    let app = test_app().await;
+    let origin = "http://localhost:5173";
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::post("/api/pair")
+                .header(header::ORIGIN, origin)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let id = body_json(response).await["request"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // A second request while one is pending is refused.
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::post("/api/pair")
+                .header(header::ORIGIN, origin)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::post("/api/pairing/respond")
+                .header(header::AUTHORIZATION, format!("Bearer {}", app.token))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(format!(r#"{{"id":"{id}","approve":false}}"#)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::get(format!("/api/pair/{id}"))
+                .header(header::ORIGIN, origin)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let json = body_json(response).await;
+    assert_eq!(json["state"], "denied");
+    assert!(json.get("token").is_none());
+}
+
+/// Pairing initiation is origin-gated server-side: no Origin or a
+/// non-allowlisted Origin never creates a request.
+#[tokio::test]
+async fn pairing_rejects_unknown_origins() {
+    let app = test_app().await;
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(Request::post("/api/pair").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::post("/api/pair")
+                .header(header::ORIGIN, "https://evil.example")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(body_json(response).await["error"]["code"], "origin_not_allowed");
+}
+
+/// The result of a pairing request is only visible to the origin that
+/// created it, even if another allowed origin learns the id.
+#[tokio::test]
+async fn pairing_result_is_origin_bound() {
+    let app = test_app().await;
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::post("/api/pair")
+                .header(header::ORIGIN, "http://localhost:5173")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let id = body_json(response).await["request"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::get(format!("/api/pair/{id}"))
+                .header(header::ORIGIN, "http://localhost:9999")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(
+        body_json(response).await["error"]["code"],
+        "pairing_origin_mismatch"
+    );
+}
+
+/// DNS-rebinding guard: any Host other than loopback is refused outright,
+/// token or no token.
+#[tokio::test]
+async fn non_loopback_host_is_rejected() {
+    let app = test_app().await;
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::get("/api/health")
+                .header(header::HOST, "attacker.example")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(body_json(response).await["error"]["code"], "host_not_local");
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::get("/api/health")
+                .header(header::HOST, format!("127.0.0.1:{PORT}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}

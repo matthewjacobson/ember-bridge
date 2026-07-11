@@ -6,7 +6,8 @@
 import { useState } from "react";
 import { BridgeProvider, useBridge } from "./hooks/useBridge";
 import { usePolling } from "./hooks/usePolling";
-import type { BridgeStatus } from "./api/types";
+import type { BridgeStatus, PendingPairing } from "./api/types";
+import type { BridgeClient } from "./api/client";
 import { MachinesPage } from "./pages/MachinesPage";
 import { SendPage } from "./pages/SendPage";
 import { LogsPage } from "./pages/LogsPage";
@@ -21,6 +22,52 @@ const PAGES: { id: Page; label: string }[] = [
   { id: "logs", label: "Logs" },
   { id: "settings", label: "Settings" },
 ];
+
+/**
+ * Approve/Deny prompt for a browser's pairing request. Rendered above every
+ * page — a pairing request should be impossible to miss, and approval must
+ * live in this window precisely because no web page can reach into it.
+ */
+function PairingBanner({ client }: { client: BridgeClient }) {
+  const pending = usePolling<PendingPairing | null>(
+    () => client.pairingPending(),
+    2000,
+  );
+  const [busy, setBusy] = useState(false);
+
+  if (!pending.data) return null;
+  const request = pending.data;
+
+  const respond = async (approve: boolean) => {
+    setBusy(true);
+    try {
+      await client.respondPairing(request.id, approve);
+    } catch {
+      // Request expired or was already answered; the next poll clears it.
+    } finally {
+      setBusy(false);
+      void pending.refresh();
+    }
+  };
+
+  return (
+    <div className="pairing-banner">
+      <div className="pairing-text">
+        <strong>{request.origin}</strong>
+        {request.appName !== "Unnamed app" && ` (${request.appName})`} wants to
+        connect to your embroidery machines.
+      </div>
+      <div className="pairing-actions">
+        <button className="danger" disabled={busy} onClick={() => respond(false)}>
+          Deny
+        </button>
+        <button className="primary" disabled={busy} onClick={() => respond(true)}>
+          Approve
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function Shell() {
   const { client, connectError, selectedIp } = useBridge();
@@ -66,6 +113,7 @@ function Shell() {
         </div>
       </nav>
       <main className="content">
+        {client && <PairingBanner client={client} />}
         {page === "machines" && <MachinesPage />}
         {page === "send" && <SendPage />}
         {page === "logs" && <LogsPage />}

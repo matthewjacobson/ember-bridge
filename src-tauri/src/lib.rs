@@ -69,6 +69,18 @@ pub fn run() {
 
             let state = Arc::new(AppState::new(config, server::PORT));
 
+            // A pairing request should be impossible to miss: surface the
+            // window when one arrives. Tauri window handles are safe to use
+            // from any thread (calls are dispatched to the main thread).
+            let handle = app.handle().clone();
+            *state.pairing_notify.lock().unwrap() = Some(Box::new(move || {
+                if let Some(window) = handle.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.unminimize();
+                    let _ = window.set_focus();
+                }
+            }));
+
             // The Tauri runtime hosts a tokio runtime; the upload worker is
             // spawned from inside it so `tokio::spawn` has a reactor.
             tauri::async_runtime::spawn({

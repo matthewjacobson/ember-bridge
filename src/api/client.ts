@@ -16,6 +16,7 @@ import type {
   MachineInfo,
   MachinesResponse,
   MachineStatus,
+  PendingPairing,
   SavedMachine,
   Settings,
 } from "./types";
@@ -145,6 +146,23 @@ export class BridgeClient {
       `/api/jobs/${encodeURIComponent(id)}`,
     );
     return result.job;
+  }
+
+  // -- Pairing (desktop-UI side) ---------------------------------------------
+
+  async pairingPending(): Promise<PendingPairing | null> {
+    const result = await this.request<{ pending: PendingPairing | null }>(
+      "/api/pairing",
+    );
+    return result.pending;
+  }
+
+  respondPairing(id: string, approve: boolean): Promise<{ ok: boolean }> {
+    return this.request("/api/pairing/respond", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, approve }),
+    });
   }
 
   // -- Logs & settings ------------------------------------------------------

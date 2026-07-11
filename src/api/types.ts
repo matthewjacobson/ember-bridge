@@ -102,6 +102,14 @@ export interface Settings {
   port: number;
 }
 
+/** A browser's pairing request awaiting Approve/Deny in this app. */
+export interface PendingPairing {
+  id: string;
+  origin: string;
+  appName: string;
+  expiresInMs: number;
+}
+
 /** Structured error body: `{"error": {"code", "message"}}`. */
 export interface ApiErrorBody {
   error: { code: string; message: string };

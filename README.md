@@ -33,10 +33,17 @@ requires Node ≥ 20.19.
 ## Localhost API (what Ember calls)
 
 All endpoints are bound to `127.0.0.1:17831` only. Every request except
-`GET /api/health` requires the API token, sent as `Authorization: Bearer
-<token>` or `X-Ember-Token: <token>`. The token is generated on first launch
-and shown on the app's **Settings** page; browser callers must also have
-their origin added to the allowlist there (CORS).
+`GET /api/health` and the browser side of pairing requires the API token,
+sent as `Authorization: Bearer <token>` or `X-Ember-Token: <token>`. Browser
+callers must also have their origin added to the allowlist on the app's
+**Settings** page (CORS); localhost origins are always allowed.
+
+A site obtains the token by **pairing**: `POST /api/pair` (the desktop app
+surfaces an Approve/Deny prompt naming the requesting origin), then poll
+`GET /api/pair/{id}` until it answers `{state: "approved", token}` — the
+token is released exactly once, only to the origin that asked, and requests
+expire after two minutes. The token is also shown on the Settings page for
+manual setup; `examples/ember-demo.html` demonstrates both paths.
 
 | Method | Path                | Purpose |
 |--------|---------------------|---------|
@@ -47,6 +54,10 @@ their origin added to the allowlist there (CORS).
 | POST   | `/api/machines`     | Save a machine `{ip, nickname?}` |
 | DELETE | `/api/machines/{ip}`| Forget a saved machine |
 | POST   | `/api/discover`     | Sweep the local network (blocks a few seconds) |
+| POST   | `/api/pair`         | Ask to pair `{appName?}` (no token; origin-gated). Returns `202 {request}` |
+| GET    | `/api/pair/{id}`    | Poll a pairing request (no token); `approved` carries the token, once |
+| GET    | `/api/pairing`      | Pending pairing request — consumed by the app's own UI banner |
+| POST   | `/api/pairing/respond` | Approve/deny `{id, approve}` — app UI only |
 | POST   | `/api/send?ip=&filename=` | Enqueue an upload; body = raw design bytes. Returns `202 {job}` |
 | GET    | `/api/jobs`, `/api/jobs/{id}` | Upload queue / progress polling |
 | GET    | `/api/logs?afterSeq=` | Incremental app log |
@@ -155,6 +166,11 @@ Reference: packet captures of *Design Database Transfer* (see the
 * CORS: browsers only get responses for origins on the user-managed
   allowlist (Settings page). Chrome's Private Network Access preflight is
   answered. `/api/health` is origin-agnostic so Ember can detect the bridge.
+* Pairing releases the token only after a human clicks Approve in the
+  desktop window, only to the origin named in the prompt, and only once;
+  initiation is refused server-side for non-allowlisted origins.
+* DNS-rebinding guard: requests whose `Host` header is not loopback are
+  rejected outright (a rebound page bypasses CORS but cannot fake `Host`).
 * Target IPs must be private/link-local IPv4 — the bridge refuses to proxy
   to loopback or the public internet.
 * Design size is validated against the machine's advertised `postsize` and
@@ -164,7 +180,8 @@ Reference: packet captures of *Design Database Transfer* (see the
 ## Status / roadmap
 
 Implemented: discovery, identification, storage query, upload queue with
-progress, machine nicknames, logs, settings, token pairing.
+progress, machine nicknames, logs, settings, one-click browser pairing
+(Approve/Deny prompt in the app).
 
 Future: mDNS (if any manufacturer supports it), system-tray mode, autostart,
 per-machine upload history, additional manufacturer backends.

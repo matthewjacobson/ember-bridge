@@ -19,10 +19,14 @@
 
   The integration flow demonstrated below:
 
-    1. DETECT  — poll GET /api/health (the only endpoint that needs no token)
-                 to see whether the bridge is installed and running.
-    2. PAIR    — the user copies the API token from the bridge's Settings
-                 page into the site once; verify it with GET /api/status.
+    1. DETECT  — poll GET /api/health (needs no token) to see whether the
+                 bridge is installed and running.
+    2. PAIR    — POST /api/pair (also tokenless, but origin-gated), which
+                 makes the desktop app show an Approve/Deny prompt naming
+                 this page's origin. Poll GET /api/pair/{id}; on approval
+                 the response carries the API token — released exactly once.
+                 Manual fallback: the token can always be copied from the
+                 bridge's Settings page instead.
     3. TARGET  — list saved machines (GET /api/machines) and offer a network
                  scan (POST /api/discover).
     4. SEND    — POST the raw design bytes to /api/send?ip=...&filename=...
@@ -116,15 +120,23 @@
   </section>
 
   <section class="step" id="step-pair">
-    <h2><span class="n">2</span> Pair with a token</h2>
+    <h2><span class="n">2</span> Pair with the bridge</h2>
     <div class="body">
-      <p class="hint">In Ember Bridge, open <strong>Settings</strong> and copy the API token.
-      Ember would store this once and reuse it forever.</p>
+      <p class="hint">Clicking Connect sends <code>POST /api/pair</code>; the Ember Bridge
+      window comes to the front asking you to approve <em>this page's origin</em>. On
+      approval, <code>GET /api/pair/{id}</code> hands over the API token — once. Ember
+      would store it and never ask again.</p>
       <div class="row">
-        <input type="password" id="token" placeholder="paste API token" autocomplete="off" />
-        <button class="primary" id="pair-btn">Pair</button>
+        <button class="primary" id="pair-btn">Connect to Ember Bridge</button>
       </div>
       <div class="status" id="pair-status"></div>
+      <details style="margin-top:10px">
+        <summary class="hint" style="cursor:pointer">Fallback: paste the token manually</summary>
+        <div class="row" style="margin-top:8px">
+          <input type="password" id="token" placeholder="token from Settings in Ember Bridge" autocomplete="off" />
+          <button id="manual-pair-btn">Use token</button>
+        </div>
+      </details>
     </div>
   </section>
 
@@ -261,22 +273,73 @@ setStep("step-detect", "active");
   }
 })();
 
-/* Step 2 — verify the pasted token with an authenticated call. */
-$("pair-btn").addEventListener("click", async () => {
-  const candidate = new BridgeClient($("token").value.trim());
-  try {
-    await candidate.get("/api/status");
-  } catch (e) {
-    setStatus("pair-status",
-      e.code === "unauthorized" ? "That token was rejected — copy it from Settings in Ember Bridge."
-                                : `Could not verify: ${e.message}`, "err");
-    return;
+/* Step 2 — pairing: ask, wait for the human to click Approve in the app,
+ * receive the token. Both pairing endpoints are tokenless but only respond
+ * to allowlisted origins (localhost is always allowed; a deployed Ember
+ * origin must be on the bridge's allowlist). */
+async function pair() {
+  // Create the request. 409 pairing_in_progress means another request is
+  // already showing in the app — rare; just tell the user.
+  const createResponse = await fetch(`${BRIDGE_URL}/api/pair`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ appName: "Ember demo" }),
+  });
+  const created = await createResponse.json();
+  if (!createResponse.ok) {
+    throw new BridgeError(created.error?.code ?? "unknown",
+                          created.error?.message ?? "pairing failed");
   }
+  const id = created.request.id;
+
+  setStatus("pair-status",
+    "Check the Ember Bridge window — approve this page to connect.", "");
+
+  // Poll until the human decides (requests expire after ~2 minutes).
+  for (;;) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const pollResponse = await fetch(`${BRIDGE_URL}/api/pair/${id}`);
+    if (pollResponse.status === 404) {
+      throw new BridgeError("pairing_expired", "The request expired — try again.");
+    }
+    const poll = await pollResponse.json();
+    if (poll.state === "approved") return poll.token;  // released exactly once
+    if (poll.state === "denied") {
+      throw new BridgeError("pairing_denied", "The request was denied in Ember Bridge.");
+    }
+  }
+}
+
+async function finishPairing(token) {
+  const candidate = new BridgeClient(token);
+  await candidate.get("/api/status");   // verify before trusting it
   client = candidate;
   setStatus("pair-status", "Paired. Ember would persist this token now.", "ok");
   setStep("step-pair", "done");
   setStep("step-target", "active");
   loadMachines();
+}
+
+$("pair-btn").addEventListener("click", async () => {
+  $("pair-btn").disabled = true;
+  try {
+    await finishPairing(await pair());
+  } catch (e) {
+    setStatus("pair-status", e.message, "err");
+  } finally {
+    $("pair-btn").disabled = false;
+  }
+});
+
+/* Fallback: paste the token from the app's Settings page. */
+$("manual-pair-btn").addEventListener("click", async () => {
+  try {
+    await finishPairing($("token").value.trim());
+  } catch (e) {
+    setStatus("pair-status",
+      e.code === "unauthorized" ? "That token was rejected — copy it from Settings in Ember Bridge."
+                                : `Could not verify: ${e.message}`, "err");
+  }
 });
 
 /* Step 3 — saved machines + discovery. */

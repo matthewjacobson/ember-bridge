@@ -7,6 +7,7 @@
 pub mod auth;
 pub mod error;
 pub mod jobs;
+pub mod pairing;
 pub mod routes;
 pub mod state;
 
@@ -32,6 +33,12 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/machines", post(routes::save_machine))
         .route("/api/machines/{ip}", delete(routes::delete_machine))
         .route("/api/discover", post(routes::discover))
+        // Browser side of pairing (tokenless; see auth::token_exempt) and
+        // the desktop-UI side (token-gated like everything else).
+        .route("/api/pair", post(routes::create_pairing))
+        .route("/api/pair/{id}", get(routes::poll_pairing))
+        .route("/api/pairing", get(routes::pairing_pending))
+        .route("/api/pairing/respond", post(routes::pairing_respond))
         .route("/api/send", post(routes::send))
         .route("/api/jobs", get(routes::list_jobs))
         .route("/api/jobs/{id}", get(routes::get_job))

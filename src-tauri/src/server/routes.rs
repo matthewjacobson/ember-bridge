@@ -12,6 +12,10 @@
 //! | POST   | /api/machines     | Save a machine `{ip, nickname?}`           |
 //! | DELETE | /api/machines/{ip}| Forget a saved machine                     |
 //! | POST   | /api/discover     | Sweep the local network (blocks ~5s)       |
+//! | POST   | /api/pair         | Browser asks to pair (no token, origin-gated) |
+//! | GET    | /api/pair/{id}    | Browser polls its pairing request (no token) |
+//! | GET    | /api/pairing      | Pending request, for the desktop UI banner |
+//! | POST   | /api/pairing/respond | Approve/deny `{id, approve}` (desktop UI) |
 //! | POST   | /api/send         | Enqueue an upload (`?ip=&filename=`, body = design bytes) |
 //! | GET    | /api/jobs         | Recent upload jobs, newest first           |
 //! | GET    | /api/jobs/{id}    | One job, for progress polling              |
@@ -21,11 +25,13 @@
 
 use crate::config::SavedMachine;
 use crate::machine::net::is_local_network_ip;
+use crate::server::auth::origin_allowed;
 use crate::server::error::ApiError;
+use crate::server::pairing::PollOutcome;
 use crate::server::state::AppState;
 use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::IntoResponse;
 use axum::Json;
 use serde::Deserialize;
@@ -260,6 +266,129 @@ pub async fn discover(State(state): State<Arc<AppState>>) -> Result<impl IntoRes
 /// limit (~3 MB today) which is enforced per-upload by the backend; this is
 /// just the transport-level bound.
 pub const MAX_UPLOAD_BYTES: usize = 32 * 1024 * 1024;
+
+// ---------------------------------------------------------------------------
+// Pairing: browser side (tokenless, origin-gated) + desktop-UI side (token)
+
+/// Extract and vet the caller's `Origin` for the tokenless pairing routes.
+/// These are the only handlers where the origin allowlist is enforced
+/// server-side: elsewhere CORS merely controls response visibility, but a
+/// pairing request must not even be *created* for an unknown origin.
+async fn vetted_pairing_origin(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<String, ApiError> {
+    let origin = headers
+        .get(header::ORIGIN)
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(|| {
+            ApiError::bad_request(
+                "origin_required",
+                "pairing is for browsers; non-browser clients read the token from the app's Settings page",
+            )
+        })?;
+    if !origin_allowed(origin, &state.config.get().await.allowed_origins) {
+        return Err(ApiError::forbidden(
+            "origin_not_allowed",
+            format!("{origin} is not on the allowed-origins list"),
+        ));
+    }
+    Ok(origin.to_string())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PairBody {
+    /// Display name shown in the approval prompt, e.g. "Ember".
+    #[serde(default)]
+    pub app_name: Option<String>,
+}
+
+pub async fn create_pairing(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    body: Option<Json<PairBody>>,
+) -> Result<impl IntoResponse, ApiError> {
+    let origin = vetted_pairing_origin(&state, &headers).await?;
+    let app_name = body
+        .and_then(|b| b.0.app_name)
+        .map(|n| n.trim().chars().take(64).collect::<String>())
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| "Unnamed app".to_string());
+
+    match state.pairing.begin(origin.clone(), app_name).await {
+        Ok(request) => {
+            state
+                .logs
+                .info(format!("{origin} is asking to pair — approve or deny in the app"));
+            // Bring the desktop window to the front so the prompt is seen.
+            if let Some(notify) = &*state.pairing_notify.lock().unwrap() {
+                notify();
+            }
+            Ok((StatusCode::ACCEPTED, Json(json!({ "request": request }))))
+        }
+        Err(()) => Err(ApiError::conflict(
+            "pairing_in_progress",
+            "another pairing request is awaiting a decision; try again shortly",
+        )),
+    }
+}
+
+pub async fn poll_pairing(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, ApiError> {
+    let origin = vetted_pairing_origin(&state, &headers).await?;
+    match state.pairing.poll(&id, &origin).await {
+        PollOutcome::Unknown => Err(ApiError::not_found(
+            "no such pairing request (it may have expired — start over)",
+        )),
+        PollOutcome::WrongOrigin => Err(ApiError::forbidden(
+            "pairing_origin_mismatch",
+            "this pairing request belongs to a different origin",
+        )),
+        PollOutcome::Pending => Ok(Json(json!({ "state": "pending" }))),
+        PollOutcome::Denied => Ok(Json(json!({ "state": "denied" }))),
+        PollOutcome::Approved => {
+            // The one moment the token crosses to the browser. The poll()
+            // above consumed the request, so this cannot repeat.
+            let token = state.config.get().await.api_token;
+            state.logs.info(format!("Pairing token released to {origin}"));
+            Ok(Json(json!({ "state": "approved", "token": token })))
+        }
+    }
+}
+
+pub async fn pairing_pending(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    Json(json!({ "pending": state.pairing.pending().await }))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PairingRespondBody {
+    pub id: String,
+    pub approve: bool,
+}
+
+pub async fn pairing_respond(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<PairingRespondBody>,
+) -> Result<impl IntoResponse, ApiError> {
+    match state.pairing.respond(&body.id, body.approve).await {
+        Some(origin) => {
+            let verdict = if body.approve { "approved" } else { "denied" };
+            state.logs.info(format!("Pairing request from {origin} {verdict}"));
+            Ok(Json(json!({ "ok": true })))
+        }
+        None => Err(ApiError::not_found(
+            "no matching pending pairing request (it may have expired)",
+        )),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Uploads
 
 pub async fn send(
     State(state): State<Arc<AppState>>,

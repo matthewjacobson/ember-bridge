@@ -4,10 +4,17 @@ use crate::config::ConfigStore;
 use crate::logging::LogBuffer;
 use crate::machine::{BackendRegistry, DiscoveredMachine};
 use crate::server::jobs::JobQueue;
+use crate::server::pairing::Pairing;
 use serde::Serialize;
 use std::sync::atomic::AtomicBool;
+use std::sync::Mutex;
 use std::time::Instant;
 use tokio::sync::RwLock;
+
+/// Callback invoked when a browser asks to pair, so the desktop shell can
+/// bring its window to the front. Kept as a plain closure so the server
+/// stays free of Tauri types (and testable without a windowing system).
+pub type PairingNotifyFn = Box<dyn Fn() + Send + Sync>;
 
 /// Result of the most recent discovery sweep, kept so `GET /api/machines`
 /// can answer instantly.
@@ -37,6 +44,8 @@ pub struct AppState {
     pub discovery_running: AtomicBool,
     pub server_health: RwLock<ServerHealth>,
     pub started_at: Instant,
+    pub pairing: Pairing,
+    pub pairing_notify: Mutex<Option<PairingNotifyFn>>,
 }
 
 impl AppState {
@@ -54,6 +63,8 @@ impl AppState {
                 error: None,
             }),
             started_at: Instant::now(),
+            pairing: Pairing::default(),
+            pairing_notify: Mutex::new(None),
         }
     }
 }
