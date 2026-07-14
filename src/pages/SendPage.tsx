@@ -1,10 +1,13 @@
 /**
- * Send page: pick a design file, check the selected machine's storage, send,
- * and watch the upload queue with live progress.
+ * Send page: pick the target machine, pick a design file, check the
+ * machine's storage, send, and watch the upload queue with live progress.
+ *
+ * The target picker writes the same shared selection the Machines page
+ * uses, so choosing a machine in either place keeps both in sync.
  */
 
-import { useRef, useState } from "react";
-import type { JobRecord, MachineStatus } from "../api/types";
+import { useEffect, useRef, useState } from "react";
+import type { JobRecord, MachinesResponse, MachineStatus } from "../api/types";
 import { useBridge } from "../hooks/useBridge";
 import { usePolling } from "../hooks/usePolling";
 import {
@@ -14,16 +17,51 @@ import {
   ProgressBar,
   Section,
 } from "../components/ui";
-import { formatBytes, formatTime } from "../lib/format";
+import { formatBytes, formatTime, machineLabel } from "../lib/format";
 
 export function SendPage() {
-  const { client, selectedIp } = useBridge();
+  const { client, selectedIp, setSelectedIp } = useBridge();
 
+  const machines = usePolling<MachinesResponse>(
+    client ? () => client.machines() : null,
+    5000,
+  );
   const machineStatus = usePolling<MachineStatus>(
     client && selectedIp ? () => client.machineStatus(selectedIp) : null,
     10000,
   );
   const jobs = usePolling<JobRecord[]>(client ? () => client.jobs() : null, 1000);
+
+  // Saved machines first, then discovered ones not already saved.
+  const saved = machines.data?.saved ?? [];
+  const targets = [
+    ...saved.map((m) => ({
+      ip: m.ip,
+      label: machineLabel({ nickname: m.nickname, ip: m.ip }),
+    })),
+    ...(machines.data?.discovered ?? [])
+      .filter((d) => !saved.some((s) => s.ip === d.info.identity.ip))
+      .map((d) => ({
+        ip: d.info.identity.ip,
+        label: machineLabel({ name: d.info.identity.name, ip: d.info.identity.ip }),
+      })),
+  ];
+
+  // The single-machine household shouldn't need a click: default to the
+  // first known machine. Never auto-clear — a briefly-offline machine keeps
+  // its selection and shows its status error instead.
+  const firstIp = targets[0]?.ip ?? null;
+  useEffect(() => {
+    if (!selectedIp && firstIp) setSelectedIp(firstIp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIp, firstIp]);
+
+  // Re-check status the moment the target changes; the 10 s poll cadence is
+  // for idling, not for answering a just-made selection.
+  useEffect(() => {
+    if (selectedIp) void machineStatus.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIp]);
 
   const fileInput = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -54,11 +92,30 @@ export function SendPage() {
   return (
     <div className="page">
       <Section title="Target machine">
-        {!selectedIp ? (
+        {targets.length === 0 && !selectedIp ? (
           <EmptyState>
-            No machine selected. Choose one on the Machines page.
+            No machines known yet — scan on the Machines page, or set up a
+            dongle.
           </EmptyState>
-        ) : machineStatus.error ? (
+        ) : (
+          <select
+            className="machine-select"
+            value={selectedIp ?? ""}
+            onChange={(e) => setSelectedIp(e.target.value || null)}
+          >
+            {/* Keep a vanished-but-selected machine choosable rather than
+                silently retargeting the send. */}
+            {selectedIp && !targets.some((t) => t.ip === selectedIp) && (
+              <option value={selectedIp}>{selectedIp} (not seen right now)</option>
+            )}
+            {targets.map((t) => (
+              <option key={t.ip} value={t.ip}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        )}
+        {!selectedIp ? null : machineStatus.error ? (
           <ErrorNote>
             {selectedIp}: {machineStatus.error}
           </ErrorNote>
