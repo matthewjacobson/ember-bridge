@@ -84,7 +84,10 @@ impl BackendRegistry {
     /// Registry with every backend this build ships with.
     pub fn with_default_backends() -> Self {
         Self {
-            backends: vec![Arc::new(crate::brother::BrotherBackend::new())],
+            backends: vec![
+                Arc::new(crate::brother::BrotherBackend::new()),
+                Arc::new(crate::emberconnect::EmberConnectBackend::new()),
+            ],
         }
     }
 

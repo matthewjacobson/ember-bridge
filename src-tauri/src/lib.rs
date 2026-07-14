@@ -15,6 +15,7 @@
 
 pub mod brother;
 pub mod config;
+pub mod emberconnect;
 pub mod logging;
 pub mod machine;
 pub mod server;

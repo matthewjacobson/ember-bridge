@@ -88,6 +88,10 @@ src-tauri/src/
     models.rs       storage / upload), MachineBackend (probe / connect /
     error.rs        discover), plus neutral models and errors, and the
     net.rs          local-network IP policy.
+  emberconnect/     EmberConnect dongle backend (our own WiFi "memory
+    client.rs       stick" hardware; see the EmberConnect repo). Plain
+    models.rs       HTTP/JSON on port 80; discovery via mDNS browse
+    discovery.rs    (_ember-connect._tcp) instead of a subnet sweep.
   brother/          Brother backend (pedxml protocol).
     protocol.rs     Pure wire format: byte-exact request builders + tolerant
                     XML response parsing. No I/O; heavily unit-tested.
@@ -181,7 +185,9 @@ Reference: packet captures of *Design Database Transfer* (see the
 
 Implemented: discovery, identification, storage query, upload queue with
 progress, machine nicknames, logs, settings, one-click browser pairing
-(Approve/Deny prompt in the app).
+(Approve/Deny prompt in the app), EmberConnect dongle backend (mDNS
+discovery + HTTP upload — covers machines with no network hardware via our
+own USB dongle).
 
-Future: mDNS (if any manufacturer supports it), system-tray mode, autostart,
-per-machine upload history, additional manufacturer backends.
+Future: system-tray mode, autostart, per-machine upload history, additional
+manufacturer backends.
