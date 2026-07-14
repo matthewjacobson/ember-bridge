@@ -283,7 +283,7 @@ async fn map_api_error(status: u16, response: reqwest::Response, size: u64) -> M
     match code.as_str() {
         "insufficient_storage" => MachineError::InsufficientStorage { size, free: 0 },
         "invalid_filename" => MachineError::Protocol(
-            "the dongle rejected the filename (letters, digits, '. _ -' only)".to_string(),
+            "the dongle rejected the filename (FAT-illegal characters?)".to_string(),
         ),
         _ => MachineError::UploadFailed(status),
     }
