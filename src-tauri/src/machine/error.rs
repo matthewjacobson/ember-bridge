@@ -41,6 +41,11 @@ pub enum MachineError {
     /// The upload completed at the HTTP level but with an unexpected status.
     #[error("upload rejected with HTTP status {0}")]
     UploadFailed(u16),
+
+    /// The machine requires this computer to pair first and refused our
+    /// attempt; the hint tells the user what to do at the machine.
+    #[error("machine requires pairing: {hint}")]
+    PairingRequired { hint: String },
 }
 
 impl MachineError {
@@ -55,6 +60,7 @@ impl MachineError {
             MachineError::InsufficientStorage { .. } => "insufficient_storage",
             MachineError::UnsupportedFormat { .. } => "unsupported_format",
             MachineError::UploadFailed(_) => "upload_failed",
+            MachineError::PairingRequired { .. } => "pairing_required",
         }
     }
 }

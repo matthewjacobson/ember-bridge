@@ -50,9 +50,10 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(config: ConfigStore, port: u16) -> Self {
+        let registry = BackendRegistry::with_default_backends(config.dir());
         Self {
             config,
-            registry: BackendRegistry::with_default_backends(),
+            registry,
             logs: LogBuffer::new(),
             jobs: JobQueue::new(),
             discovered: RwLock::new(DiscoveryCache::default()),

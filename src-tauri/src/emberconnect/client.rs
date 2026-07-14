@@ -10,13 +10,18 @@
 //!   that tail.
 //! * Few sockets on the ESP32: connections are not pooled.
 
-use super::models::{DongleFile, DongleInfo, ErrorResponse, FileList, Health, UploadResponse};
+use super::models::{
+    DongleFile, DongleInfo, ErrorResponse, FileList, Health, PairResponse, UploadResponse,
+};
+use super::tokens::TokenStore;
 use crate::machine::{
     EmbroideryMachine, MachineCapabilities, MachineError, MachineIdentity, MachineInfo,
     ProgressFn, StorageStatus, UploadProgress, UploadReceipt, UploadRequest,
 };
 use async_trait::async_trait;
 use std::net::IpAddr;
+use std::sync::Arc;
+use std::sync::OnceLock;
 use std::time::Duration;
 
 /// Formats commonly readable from a USB stick across manufacturers. The
@@ -35,23 +40,33 @@ const READ_RETRIES: u32 = 3;
 const UPLOAD_RETRIES: u32 = 2;
 const RETRY_DELAY: Duration = Duration::from_millis(1000);
 
+/// How this computer introduces itself when pairing; the dongle shows the
+/// name in its paired-clients list.
+const PAIR_CLIENT_NAME: &str = "Ember Bridge";
+
 /// A handle to one EmberConnect dongle. Cheap to create.
 pub struct EmberConnectClient {
     ip: IpAddr,
     port: u16,
     http: reqwest::Client,
+    tokens: Arc<TokenStore>,
+    /// Serial learned from the first `/api/health` answer, so token lookups
+    /// don't repeat the round-trip on every call.
+    serial: OnceLock<Option<String>>,
 }
 
 impl EmberConnectClient {
-    pub fn new(ip: IpAddr) -> Self {
-        Self::with_port(ip, 80)
+    pub fn new(ip: IpAddr, tokens: Arc<TokenStore>) -> Self {
+        Self::with_port(ip, 80, tokens)
     }
 
     /// Non-default port; used by tests that run a mock dongle on localhost.
-    pub fn with_port(ip: IpAddr, port: u16) -> Self {
+    pub fn with_port(ip: IpAddr, port: u16, tokens: Arc<TokenStore>) -> Self {
         Self {
             ip,
             port,
+            tokens,
+            serial: OnceLock::new(),
             http: reqwest::Client::builder()
                 .connect_timeout(CONNECT_TIMEOUT)
                 // The ESP32 http server has a handful of sockets; keeping
@@ -91,32 +106,100 @@ impl EmberConnectClient {
             .map_err(|e| MachineError::Protocol(format!("/api/health is not valid JSON: {e}")))
     }
 
+    /// The dongle's serial, learned from `/api/health` once and cached.
+    async fn serial(&self) -> Result<Option<String>, MachineError> {
+        if let Some(serial) = self.serial.get() {
+            return Ok(serial.clone());
+        }
+        let health = self.probe_health().await?;
+        Ok(self.serial.get_or_init(|| health.serial).clone())
+    }
+
+    /// The token we hold for this dongle, if we've paired before.
+    async fn stored_token(&self) -> Result<Option<String>, MachineError> {
+        Ok(self
+            .serial()
+            .await?
+            .and_then(|serial| self.tokens.get(&serial)))
+    }
+
+    /// Pair with the dongle and persist the minted token. Fails with
+    /// [`MachineError::PairingRequired`] when the dongle's pairing window is
+    /// closed — the user has to power-cycle it (or tap its button) first.
+    async fn pair(&self) -> Result<String, MachineError> {
+        let response = self
+            .http
+            .post(self.url("/api/pair"))
+            .json(&serde_json::json!({ "name": PAIR_CLIENT_NAME }))
+            .timeout(READ_TIMEOUT)
+            .send()
+            .await
+            .map_err(map_transport_error)?;
+
+        if !response.status().is_success() {
+            let body = response.text().await.unwrap_or_default();
+            let hint = serde_json::from_str::<ErrorResponse>(&body)
+                .map(|e| e.error.message)
+                .ok()
+                .filter(|m| !m.is_empty())
+                .unwrap_or_else(|| {
+                    "unplug and replug the dongle, then try again within 5 minutes".to_string()
+                });
+            return Err(MachineError::PairingRequired { hint });
+        }
+
+        let body: PairResponse = response.json().await.map_err(|e| {
+            MachineError::Protocol(format!("pair response is not valid JSON: {e}"))
+        })?;
+        let serial = match body.serial {
+            Some(s) => Some(s),
+            None => self.serial().await?,
+        };
+        if let Some(serial) = serial {
+            self.tokens.set(&serial, &body.token);
+        }
+        tracing::info!("paired with EmberConnect dongle at {}", self.ip);
+        Ok(body.token)
+    }
+
+    /// Authenticated GET with transparent pairing: attach the stored token
+    /// if any; on 401 (never paired, revoked, or factory-reset dongle) pair
+    /// and retry once. Dongles on pre-auth firmware never answer 401, so
+    /// they work unchanged.
+    async fn get_json<T: serde::de::DeserializeOwned>(
+        &self,
+        path: &str,
+    ) -> Result<T, MachineError> {
+        let mut request = self.http.get(self.url(path)).timeout(READ_TIMEOUT);
+        if let Some(token) = self.stored_token().await? {
+            request = request.bearer_auth(token);
+        }
+        let response = request.send().await.map_err(map_transport_error)?;
+        if response.status().as_u16() != 401 {
+            return decode_json::<T>(response).await;
+        }
+
+        if let Some(serial) = self.serial().await? {
+            self.tokens.forget(&serial); // the dongle no longer accepts it
+        }
+        let token = self.pair().await?;
+        let response = self
+            .http
+            .get(self.url(path))
+            .bearer_auth(token)
+            .timeout(READ_TIMEOUT)
+            .send()
+            .await
+            .map_err(map_transport_error)?;
+        decode_json::<T>(response).await
+    }
+
     async fn fetch_dongle_info(&self) -> Result<DongleInfo, MachineError> {
-        with_retries(READ_RETRIES, || async {
-            let response = self
-                .http
-                .get(self.url("/api/info"))
-                .timeout(READ_TIMEOUT)
-                .send()
-                .await
-                .map_err(map_transport_error)?;
-            decode_json::<DongleInfo>(response).await
-        })
-        .await
+        with_retries(READ_RETRIES, || self.get_json::<DongleInfo>("/api/info")).await
     }
 
     async fn fetch_files(&self) -> Result<FileList, MachineError> {
-        with_retries(READ_RETRIES, || async {
-            let response = self
-                .http
-                .get(self.url("/api/files"))
-                .timeout(READ_TIMEOUT)
-                .send()
-                .await
-                .map_err(map_transport_error)?;
-            decode_json::<FileList>(response).await
-        })
-        .await
+        with_retries(READ_RETRIES, || self.get_json::<FileList>("/api/files")).await
     }
 
     pub(crate) fn to_machine_info(&self, health: &Health) -> MachineInfo {
@@ -226,18 +309,31 @@ impl EmbroideryMachine for EmberConnectClient {
                     },
                 ));
 
-                let response = self
+                let mut request = self
                     .http
                     .post(self.url("/api/upload"))
                     .query(&[("filename", filename.as_str())])
                     .header(reqwest::header::CONTENT_LENGTH, size)
                     .timeout(UPLOAD_TIMEOUT)
-                    .body(reqwest::Body::wrap_stream(stream))
-                    .send()
-                    .await
-                    .map_err(map_transport_error)?;
+                    .body(reqwest::Body::wrap_stream(stream));
+                if let Some(token) = self.stored_token().await? {
+                    request = request.bearer_auth(token);
+                }
+                let response = request.send().await.map_err(map_transport_error)?;
 
                 let status = response.status();
+                if status.as_u16() == 401 {
+                    // Rare here — the free-space check above already paired —
+                    // but the token can be revoked between the two calls.
+                    // Pair now and let the retry loop re-send with it.
+                    if let Some(serial) = self.serial().await? {
+                        self.tokens.forget(&serial);
+                    }
+                    self.pair().await?;
+                    return Err(MachineError::Protocol(
+                        "dongle token was stale; re-paired".to_string(),
+                    ));
+                }
                 if !status.is_success() {
                     return Err(map_api_error(status.as_u16(), response, size).await);
                 }
@@ -321,7 +417,8 @@ where
             Err(e @ (MachineError::Rejected { .. }
             | MachineError::FileTooLarge { .. }
             | MachineError::InsufficientStorage { .. }
-            | MachineError::UnsupportedFormat { .. })) => return Err(e),
+            | MachineError::UnsupportedFormat { .. }
+            | MachineError::PairingRequired { .. })) => return Err(e),
             Err(e) => {
                 last = Some(e);
                 if i + 1 < attempts {

@@ -19,8 +19,10 @@
 pub mod client;
 pub mod discovery;
 pub mod models;
+pub mod tokens;
 
 pub use client::EmberConnectClient;
+pub use tokens::TokenStore;
 
 use crate::machine::{
     DiscoveredMachine, EmbroideryMachine, MachineBackend, MachineError, MachineInfo,
@@ -33,17 +35,17 @@ use std::sync::Arc;
 pub const MANUFACTURER: &str = "emberconnect";
 
 /// The EmberConnect backend registered in [`crate::machine::BackendRegistry`].
-pub struct EmberConnectBackend;
-
-impl EmberConnectBackend {
-    pub fn new() -> Self {
-        Self
-    }
+pub struct EmberConnectBackend {
+    /// Pairing tokens by dongle serial, shared by every client this backend
+    /// hands out (firmware 0.4.0+ requires them; older firmware ignores them).
+    tokens: Arc<TokenStore>,
 }
 
-impl Default for EmberConnectBackend {
-    fn default() -> Self {
-        Self::new()
+impl EmberConnectBackend {
+    pub fn new(config_dir: &std::path::Path) -> Self {
+        Self {
+            tokens: Arc::new(TokenStore::load(config_dir)),
+        }
     }
 }
 
@@ -54,7 +56,7 @@ impl MachineBackend for EmberConnectBackend {
     }
 
     async fn probe(&self, ip: IpAddr) -> Result<Option<MachineInfo>, MachineError> {
-        let client = EmberConnectClient::new(ip);
+        let client = EmberConnectClient::new(ip, self.tokens.clone());
         match client.probe_health().await {
             // A device is "ours" iff /api/health answers with our name.
             Ok(health) if health.is_ember_connect() => {
@@ -66,10 +68,10 @@ impl MachineBackend for EmberConnectBackend {
     }
 
     fn connect(&self, ip: IpAddr) -> Arc<dyn EmbroideryMachine> {
-        Arc::new(EmberConnectClient::new(ip))
+        Arc::new(EmberConnectClient::new(ip, self.tokens.clone()))
     }
 
     async fn discover(&self, on_progress: ScanProgressFn) -> Vec<DiscoveredMachine> {
-        discovery::discover(on_progress).await
+        discovery::discover(self, on_progress).await
     }
 }

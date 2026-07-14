@@ -81,12 +81,13 @@ pub struct BackendRegistry {
 }
 
 impl BackendRegistry {
-    /// Registry with every backend this build ships with.
-    pub fn with_default_backends() -> Self {
+    /// Registry with every backend this build ships with. `config_dir` is
+    /// where backends keep their persistent state (pairing tokens).
+    pub fn with_default_backends(config_dir: &std::path::Path) -> Self {
         Self {
             backends: vec![
                 Arc::new(crate::brother::BrotherBackend::new()),
-                Arc::new(crate::emberconnect::EmberConnectBackend::new()),
+                Arc::new(crate::emberconnect::EmberConnectBackend::new(config_dir)),
             ],
         }
     }

@@ -82,6 +82,9 @@ impl From<MachineError> for ApiError {
             MachineError::FileTooLarge { .. }
             | MachineError::InsufficientStorage { .. }
             | MachineError::UnsupportedFormat { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+            // Not an error the caller can fix in software: the user must
+            // perform the pairing gesture at the machine itself.
+            MachineError::PairingRequired { .. } => StatusCode::FORBIDDEN,
         };
         Self {
             status,

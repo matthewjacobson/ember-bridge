@@ -92,6 +92,10 @@ src-tauri/src/
     client.rs       stick" hardware; see the EmberConnect repo). Plain
     models.rs       HTTP/JSON on port 80; discovery via mDNS browse
     discovery.rs    (_ember-connect._tcp) instead of a subnet sweep.
+    tokens.rs       Pairing tokens by dongle serial (firmware 0.4.0+
+                    requires them); pairing happens transparently on 401
+                    while the dongle's pairing window is open, else the
+                    user is told to replug it (pairing_required).
   brother/          Brother backend (pedxml protocol).
     protocol.rs     Pure wire format: byte-exact request builders + tolerant
                     XML response parsing. No I/O; heavily unit-tested.

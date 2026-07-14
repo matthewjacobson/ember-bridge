@@ -47,7 +47,10 @@ fn browse_candidates() -> Vec<IpAddr> {
 }
 
 /// Discover dongles: mDNS browse, then verify each candidate over HTTP.
-pub async fn discover(on_progress: ScanProgressFn) -> Vec<DiscoveredMachine> {
+pub async fn discover(
+    backend: &super::EmberConnectBackend,
+    on_progress: ScanProgressFn,
+) -> Vec<DiscoveredMachine> {
     let candidates = tokio::task::spawn_blocking(browse_candidates)
         .await
         .unwrap_or_default();
@@ -59,7 +62,6 @@ pub async fn discover(on_progress: ScanProgressFn) -> Vec<DiscoveredMachine> {
         return Vec::new();
     }
 
-    let backend = super::EmberConnectBackend::new();
     let mut machines = Vec::new();
     for (index, ip) in candidates.into_iter().enumerate() {
         if let Ok(Some(info)) = backend.probe(ip).await {

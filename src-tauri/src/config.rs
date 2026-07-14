@@ -94,6 +94,12 @@ impl ConfigStore {
         self.config.read().await.clone()
     }
 
+    /// The directory holding `config.json`; sibling stores (e.g. the
+    /// EmberConnect token store) live alongside it.
+    pub fn dir(&self) -> &std::path::Path {
+        self.path.parent().expect("config path always has a parent")
+    }
+
     /// Mutate the config and persist it atomically.
     pub async fn update<F: FnOnce(&mut AppConfig)>(&self, mutate: F) -> std::io::Result<AppConfig> {
         let mut guard = self.config.write().await;

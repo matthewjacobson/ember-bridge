@@ -68,6 +68,17 @@ pub struct UploadResponse {
     pub file: Option<DongleFile>,
 }
 
+/// `POST /api/pair` success body (firmware 0.4.0+).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PairResponse {
+    #[serde(default)]
+    pub ok: bool,
+    #[serde(default)]
+    pub token: String,
+    pub serial: Option<String>,
+}
+
 /// Error envelope: `{"error": {"code": "...", "message": "..."}}`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ErrorResponse {
