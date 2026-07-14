@@ -7,7 +7,7 @@ use crate::server::jobs::JobQueue;
 use crate::server::pairing::Pairing;
 use serde::Serialize;
 use std::sync::atomic::AtomicBool;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tokio::sync::RwLock;
 
@@ -38,6 +38,9 @@ pub struct ServerHealth {
 pub struct AppState {
     pub config: ConfigStore,
     pub registry: BackendRegistry,
+    /// EmberConnect pairing tokens — one live map shared between the LAN
+    /// backend (reads) and the USB setup flow (pre-pairs new dongles).
+    pub dongle_tokens: Arc<crate::emberconnect::TokenStore>,
     pub logs: LogBuffer,
     pub jobs: JobQueue,
     pub discovered: RwLock<DiscoveryCache>,
@@ -50,10 +53,12 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(config: ConfigStore, port: u16) -> Self {
-        let registry = BackendRegistry::with_default_backends(config.dir());
+        let dongle_tokens = Arc::new(crate::emberconnect::TokenStore::load(config.dir()));
+        let registry = BackendRegistry::with_default_backends(dongle_tokens.clone());
         Self {
             config,
             registry,
+            dongle_tokens,
             logs: LogBuffer::new(),
             jobs: JobQueue::new(),
             discovered: RwLock::new(DiscoveryCache::default()),

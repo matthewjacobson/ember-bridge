@@ -53,13 +53,18 @@ body {
 }
 
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 600;
   padding: 6px 10px 16px;
   letter-spacing: 0.02em;
 }
 
 .brand-mark {
-  color: var(--accent);
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
 }
 
 .nav-item {
@@ -93,6 +98,39 @@ body {
   font-size: 11px;
   font-weight: 700;
   padding: 1px 7px;
+}
+
+/* "Set up dongle": appears only while a dongle is plugged into this
+   computer, pinned just above the footer, pulsing gently until visited. */
+.setup-cta {
+  margin-top: auto;
+  margin-bottom: 8px;
+  color: var(--accent);
+}
+
+/* The footer also claims margin-top:auto (its anchor when no dongle is
+   plugged in); with both set, flexbox splits the slack and the button
+   floats mid-sidebar. When the button is present, it owns the slack. */
+.setup-cta ~ .sidebar-footer {
+  margin-top: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .setup-cta:not(.active) {
+    animation: setup-pulse 1.8s ease-in-out infinite;
+  }
+}
+
+@keyframes setup-pulse {
+  0%,
+  100% {
+    background: none;
+    box-shadow: none;
+  }
+  50% {
+    background: var(--accent-soft);
+    box-shadow: 0 0 14px rgba(240, 128, 60, 0.35);
+  }
 }
 
 .sidebar-footer {
@@ -213,6 +251,7 @@ button.danger:hover:not(:disabled) {
 }
 
 input,
+select,
 textarea {
   font: inherit;
   background: var(--bg);
@@ -224,9 +263,17 @@ textarea {
 }
 
 input:focus,
+select:focus,
 textarea:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+/* Target picker on the Send page. */
+.machine-select {
+  width: 100%;
+  max-width: 420px;
+  margin-bottom: 10px;
 }
 
 textarea {

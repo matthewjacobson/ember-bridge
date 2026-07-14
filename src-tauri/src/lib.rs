@@ -15,6 +15,7 @@
 
 pub mod brother;
 pub mod config;
+pub mod dongle_setup;
 pub mod emberconnect;
 pub mod logging;
 pub mod machine;
@@ -95,7 +96,14 @@ pub fn run() {
             app.manage(state);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![local_api_info])
+        .invoke_handler(tauri::generate_handler![
+            local_api_info,
+            dongle_setup::dongle_list,
+            dongle_setup::dongle_info,
+            dongle_setup::dongle_scan,
+            dongle_setup::dongle_provision,
+            dongle_setup::dongle_update_firmware,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

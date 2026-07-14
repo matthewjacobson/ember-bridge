@@ -96,6 +96,16 @@ src-tauri/src/
                     requires them); pairing happens transparently on 401
                     while the dongle's pairing window is open, else the
                     user is told to replug it (pairing_required).
+  dongle_setup/     Desktop (USB) setup for EmberConnect dongles: the
+    mod.rs          "plug it into your computer first" out-of-box flow.
+    link.rs         CDC-ACM serial transport (line-delimited JSON; protocol
+                    defined in the EmberConnect repo, usb_setup.h). Scans
+                    WiFi with the dongle's radio, live-trials credentials
+                    (commit-on-success → wrong password is an inline retry),
+                    names the machine, pre-pairs this Bridge (writes into
+                    the shared TokenStore), pushes signed firmware. Exposed
+                    as Tauri commands, NOT on the localhost REST API —
+                    browser origins have no business provisioning hardware.
   brother/          Brother backend (pedxml protocol).
     protocol.rs     Pure wire format: byte-exact request builders + tolerant
                     XML response parsing. No I/O; heavily unit-tested.
@@ -118,9 +128,10 @@ src-tauri/src/
                     the same REST API as Ember.
 
 src/
-  api/              Typed client for the bridge API (mirrors Rust models).
+  api/              Typed client for the bridge API (mirrors Rust models),
+                    plus dongle.ts (dongle-setup Tauri command wrappers).
   hooks/            BridgeProvider (client + selected machine), usePolling.
-  pages/            Machines, Send, Logs, Settings.
+  pages/            Machines, Set up dongle, Send, Logs, Settings.
   components/       Small presentational pieces.
 ```
 

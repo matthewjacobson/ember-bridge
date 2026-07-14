@@ -43,9 +43,13 @@ pub struct EmberConnectBackend {
 
 impl EmberConnectBackend {
     pub fn new(config_dir: &std::path::Path) -> Self {
-        Self {
-            tokens: Arc::new(TokenStore::load(config_dir)),
-        }
+        Self::with_tokens(Arc::new(TokenStore::load(config_dir)))
+    }
+
+    /// Share a token store owned elsewhere — the USB setup flow pre-pairs
+    /// dongles and must write into the same live map this backend reads.
+    pub fn with_tokens(tokens: Arc<TokenStore>) -> Self {
+        Self { tokens }
     }
 }
 

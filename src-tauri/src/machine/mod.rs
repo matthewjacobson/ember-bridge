@@ -81,13 +81,18 @@ pub struct BackendRegistry {
 }
 
 impl BackendRegistry {
-    /// Registry with every backend this build ships with. `config_dir` is
-    /// where backends keep their persistent state (pairing tokens).
-    pub fn with_default_backends(config_dir: &std::path::Path) -> Self {
+    /// Registry with every backend this build ships with. `dongle_tokens`
+    /// is the EmberConnect pairing-token store, shared with the USB setup
+    /// flow (which mints tokens this backend then presents on the LAN).
+    pub fn with_default_backends(
+        dongle_tokens: Arc<crate::emberconnect::TokenStore>,
+    ) -> Self {
         Self {
             backends: vec![
                 Arc::new(crate::brother::BrotherBackend::new()),
-                Arc::new(crate::emberconnect::EmberConnectBackend::new(config_dir)),
+                Arc::new(crate::emberconnect::EmberConnectBackend::with_tokens(
+                    dongle_tokens,
+                )),
             ],
         }
     }

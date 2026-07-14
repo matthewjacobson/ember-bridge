@@ -207,12 +207,18 @@ impl EmberConnectClient {
             identity: MachineIdentity {
                 manufacturer: super::MANUFACTURER.to_string(),
                 model: "EmberConnect dongle".to_string(),
-                // Match the setup-hotspot / mDNS naming so users recognize it.
-                name: health
-                    .serial
-                    .as_ref()
-                    .filter(|s| s.len() >= 4)
-                    .map(|s| format!("EmberConnect-{}", &s[s.len() - 4..])),
+                // The name the user gave the machine during setup; for
+                // unnamed (or pre-0.5.0) dongles, fall back to the
+                // setup-hotspot / mDNS naming so users still recognize it.
+                name: Some(health.device_name.clone())
+                    .filter(|n| !n.is_empty())
+                    .or_else(|| {
+                        health
+                            .serial
+                            .as_ref()
+                            .filter(|s| s.len() >= 4)
+                            .map(|s| format!("EmberConnect-{}", &s[s.len() - 4..]))
+                    }),
                 firmware: health.version.clone(),
                 serial: health.serial.clone(),
                 ip: self.ip,

@@ -38,6 +38,8 @@ async-trait = "0.1"
 
 # EmberConnect dongle discovery (the dongle announces _ember-connect._tcp).
 mdns-sd = "0.13"
+# EmberConnect desktop setup — the dongle's CDC-ACM serial port over USB.
+serialport = "4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rand = "0.9"

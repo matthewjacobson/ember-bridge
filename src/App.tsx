@@ -1,20 +1,23 @@
 /**
  * App shell: sidebar navigation + page router (plain state, no router
- * dependency — four static pages don't warrant one).
+ * dependency — five static pages don't warrant one).
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BridgeProvider, useBridge } from "./hooks/useBridge";
 import { usePolling } from "./hooks/usePolling";
 import type { BridgeStatus, PendingPairing } from "./api/types";
 import type { BridgeClient } from "./api/client";
+import { listDongles } from "./api/dongle";
+import emberIcon from "./assets/ember-icon.svg";
 import { MachinesPage } from "./pages/MachinesPage";
+import { SetupPage } from "./pages/SetupPage";
 import { SendPage } from "./pages/SendPage";
 import { LogsPage } from "./pages/LogsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import "./App.css";
 
-type Page = "machines" | "send" | "logs" | "settings";
+type Page = "machines" | "setup" | "send" | "logs" | "settings";
 
 const PAGES: { id: Page; label: string }[] = [
   { id: "machines", label: "Machines" },
@@ -77,6 +80,15 @@ function Shell() {
     5000,
   );
 
+  // The setup entry only exists while a dongle is physically plugged into
+  // this computer (cheap USB enumeration, no port is opened).
+  const dongles = usePolling(listDongles, 3000);
+  const donglePresent = (dongles.data?.length ?? 0) > 0;
+  useEffect(() => {
+    // Unplugged while on the (now hidden) setup page: don't strand the user.
+    if (page === "setup" && !donglePresent) setPage("machines");
+  }, [page, donglePresent]);
+
   if (connectError) {
     return (
       <div className="boot-error">
@@ -90,7 +102,7 @@ function Shell() {
     <div className="shell">
       <nav className="sidebar">
         <div className="brand">
-          <span className="brand-mark">✦</span> Ember Bridge
+          <img className="brand-mark" src={emberIcon} alt="" /> Ember Bridge
         </div>
         {PAGES.map((p) => (
           <button
@@ -104,6 +116,14 @@ function Shell() {
             )}
           </button>
         ))}
+        {donglePresent && (
+          <button
+            className={`nav-item setup-cta ${page === "setup" ? "active" : ""}`}
+            onClick={() => setPage("setup")}
+          >
+            Ember Connect Set Up
+          </button>
+        )}
         <div className="sidebar-footer">
           <div className={`dot ${status.data?.server.running ? "dot-ok" : "dot-err"}`} />
           {status.data?.server.running
@@ -115,6 +135,7 @@ function Shell() {
       <main className="content">
         {client && <PairingBanner client={client} />}
         {page === "machines" && <MachinesPage />}
+        {page === "setup" && <SetupPage />}
         {page === "send" && <SendPage />}
         {page === "logs" && <LogsPage />}
         {page === "settings" && <SettingsPage />}

@@ -24,6 +24,8 @@ struct MockDongle {
     uploads: Arc<Mutex<Vec<(String, Vec<u8>)>>>,
     /// Simulate a nearly-full card.
     free_bytes: u64,
+    /// User-chosen machine name (firmware 0.5.0+); "" = never named.
+    device_name: String,
     /// Firmware 0.4.0+ behaviour: everything but health/pair wants a token.
     require_auth: bool,
     /// Whether POST /api/pair currently succeeds.
@@ -59,12 +61,13 @@ fn unauthorized() -> (StatusCode, Json<serde_json::Value>) {
 
 async fn start_mock(dongle: MockDongle) -> (u16, MockDongle) {
     let free = dongle.free_bytes;
+    let device_name = dongle.device_name.clone();
     let app = Router::new()
         .route(
             "/api/health",
-            get(|| async {
+            get(move || async move {
                 Json(json!({
-                    "ok": true, "name": "EmberConnect",
+                    "ok": true, "name": "EmberConnect", "deviceName": device_name,
                     "version": "0.4.0", "serial": "A1B2C3D4E5F6"
                 }))
             }),
@@ -202,10 +205,24 @@ async fn probe_identifies_a_dongle_and_builds_identity() {
 
     let info = client(port, empty_store()).info().await.unwrap();
     assert_eq!(info.identity.manufacturer, "emberconnect");
+    // Never named → fall back to the setup-hotspot style name.
     assert_eq!(info.identity.name.as_deref(), Some("EmberConnect-E5F6"));
     assert_eq!(info.identity.serial.as_deref(), Some("A1B2C3D4E5F6"));
     assert_eq!(info.identity.firmware.as_deref(), Some("0.4.0"));
     assert!(info.capabilities.formats.iter().any(|f| f == "pes"));
+}
+
+#[tokio::test]
+async fn user_chosen_device_name_wins_over_serial_fallback() {
+    let (port, _dongle) = start_mock(MockDongle {
+        free_bytes: 500_000,
+        device_name: "Sewing room Brother".to_string(),
+        ..Default::default()
+    })
+    .await;
+
+    let info = client(port, empty_store()).info().await.unwrap();
+    assert_eq!(info.identity.name.as_deref(), Some("Sewing room Brother"));
 }
 
 #[tokio::test]

@@ -13,6 +13,10 @@ pub struct Health {
     pub ok: bool,
     #[serde(default)]
     pub name: String,
+    /// The machine name the user chose during setup ("Sewing room
+    /// Brother"). Empty on pre-0.5.0 firmware or when never set.
+    #[serde(default)]
+    pub device_name: String,
     pub version: Option<String>,
     pub serial: Option<String>,
 }
