@@ -1,6 +1,6 @@
 [package]
 name = "ember-bridge"
-version = "0.3.0"
+version = "0.3.1"
 description = "Ember Bridge — desktop bridge between the Ember embroidery editor and WiFi-capable embroidery machines"
 authors = ["Ember"]
 edition = "2021"
