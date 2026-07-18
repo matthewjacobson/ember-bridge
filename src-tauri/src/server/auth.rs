@@ -185,13 +185,26 @@ fn host_is_loopback(host: &str) -> bool {
     bare == "127.0.0.1" || bare == "localhost" || bare == "::1"
 }
 
-/// An origin is allowed if it is loopback (the app's own UI in dev, or any
-/// local tool the user runs), the app's own webview origin, on the
-/// user-managed allowlist, or the allowlist contains `"*"`.
+/// First-party Ember web origins, always allowed without any user
+/// configuration — talking to these sites is the whole reason the bridge
+/// exists. Baked into the binary rather than seeded into user config so a
+/// fresh install and every existing install work out of the box. Stored as
+/// scheme+host with no trailing slash and no port, exactly as a browser
+/// sends the `Origin` header for an https default-port page.
+pub(crate) const EMBER_ORIGINS: &[&str] =
+    &["https://emberdesign.net", "https://v2.emberdesign.net"];
+
+/// An origin is allowed if it is a first-party Ember origin, loopback (the
+/// app's own UI in dev, or any local tool the user runs), the app's own
+/// webview origin, on the user-managed allowlist, or the allowlist contains
+/// `"*"`.
 ///
 /// Also consulted by the pairing routes, which must gate *initiation* on
 /// the allowlist server-side rather than relying on response visibility.
 pub(crate) fn origin_allowed(origin: &str, allowlist: &[String]) -> bool {
+    if EMBER_ORIGINS.contains(&origin) {
+        return true;
+    }
     if allowlist.iter().any(|a| a == "*" || a == origin) {
         return true;
     }
@@ -246,6 +259,14 @@ mod tests {
         assert!(origin_allowed("http://localhost:1420", &list));
         assert!(origin_allowed("http://127.0.0.1:8080", &list));
         assert!(origin_allowed("tauri://localhost", &list));
+        // First-party Ember origins are always allowed, even with an empty
+        // allowlist, and only at their exact origin — no trailing slash,
+        // no plain http, no look-alike suffixes.
+        assert!(origin_allowed("https://emberdesign.net", &[]));
+        assert!(origin_allowed("https://v2.emberdesign.net", &[]));
+        assert!(!origin_allowed("https://emberdesign.net/", &[]));
+        assert!(!origin_allowed("http://emberdesign.net", &[]));
+        assert!(!origin_allowed("https://emberdesign.net.evil.com", &[]));
         // Wildcard.
         assert!(origin_allowed("https://anything.example", &["*".to_string()]));
     }

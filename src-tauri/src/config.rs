@@ -29,8 +29,9 @@ pub struct AppConfig {
     /// Bearer token required on every localhost API request. Generated on
     /// first launch; the user pastes it into Ember once.
     pub api_token: String,
-    /// Web origins allowed to call the API from a browser (CORS allowlist).
-    /// Localhost origins and the app's own webview are always allowed;
+    /// Additional web origins allowed to call the API from a browser (CORS
+    /// allowlist). The first-party Ember origins, localhost origins, and the
+    /// app's own webview are always allowed without listing them here;
     /// `"*"` allows every origin (the token remains required).
     #[serde(default)]
     pub allowed_origins: Vec<String>,

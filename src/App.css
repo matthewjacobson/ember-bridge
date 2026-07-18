@@ -154,7 +154,9 @@ body {
 
 .content {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .page {
@@ -185,6 +187,8 @@ body {
 
 .pairing-text {
   flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .pairing-actions {
@@ -217,6 +221,12 @@ body {
   letter-spacing: 0.06em;
   color: var(--text-dim);
   margin: 0;
+}
+
+.section-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 /* ---- controls ----------------------------------------------------------- */
@@ -286,11 +296,17 @@ textarea {
 
 .inline-form {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
+.inline-form input {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
 .inline-form input:first-child {
-  width: 220px;
+  flex-basis: 220px;
 }
 
 /* ---- machines ----------------------------------------------------------- */
@@ -324,6 +340,7 @@ textarea {
   align-items: center;
   gap: 8px;
   flex: 1;
+  min-width: 0;
   background: none;
   border: none;
   padding: 0;
@@ -333,6 +350,10 @@ textarea {
 
 .machine-name {
   font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .machine-actions {
@@ -347,21 +368,33 @@ textarea {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
   margin-bottom: 10px;
+}
+
+.target-header strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .storage-line {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
+  gap: 12px;
   margin-bottom: 6px;
 }
 
 .file-list {
   margin: 8px 0 0;
+  overflow-wrap: anywhere;
 }
 
 .send-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
 }
@@ -383,6 +416,10 @@ textarea {
 
 .job-name {
   font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .job-time {
@@ -444,7 +481,7 @@ textarea {
 
 .kv {
   display: grid;
-  grid-template-columns: 160px 1fr;
+  grid-template-columns: 160px minmax(0, 1fr);
   gap: 6px 12px;
   margin: 0;
 }
@@ -455,6 +492,7 @@ textarea {
 
 .kv dd {
   margin: 0;
+  overflow-wrap: anywhere;
   user-select: text;
 }
 
