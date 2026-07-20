@@ -939,7 +939,7 @@ checksum = "4ef6b89e5b37196644d8796de5268852ff179b44e96276cf4290264843743bb7"
 
 [[package]]
 name = "ember-bridge"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "axum",
