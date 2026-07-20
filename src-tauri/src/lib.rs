@@ -24,7 +24,23 @@ pub mod server;
 use serde::Serialize;
 use server::state::AppState;
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{
+    menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    AppHandle, Manager, WindowEvent,
+};
+use tauri_plugin_autostart::{ManagerExt, MacosLauncher};
+
+/// Bring the main window to the foreground. Shared by the tray (show item and
+/// left-click) and by an incoming pairing request, which must never be missed.
+/// Window handles are thread-safe; calls are dispatched to the main thread.
+fn show_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
 
 /// Everything the React UI needs to reach the localhost API. The UI then
 /// uses the same REST API as Ember — one API surface, exercised constantly.
@@ -61,6 +77,12 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        // Autostart launches the app with `--minimized` so a login-time start
+        // boots straight to the tray without popping the window.
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--minimized"]),
+        ))
         .setup(|app| {
             let config_dir = app
                 .path()
@@ -72,16 +94,90 @@ pub fn run() {
             let state = Arc::new(AppState::new(config, server::PORT));
 
             // A pairing request should be impossible to miss: surface the
-            // window when one arrives. Tauri window handles are safe to use
-            // from any thread (calls are dispatched to the main thread).
+            // window when one arrives.
             let handle = app.handle().clone();
             *state.pairing_notify.lock().unwrap() = Some(Box::new(move || {
-                if let Some(window) = handle.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.unminimize();
-                    let _ = window.set_focus();
-                }
+                show_main_window(&handle);
             }));
+
+            // ---- system tray ------------------------------------------------
+            // The bridge is a background service, so it lives in the tray: the
+            // window can be closed without stopping uploads or the local API.
+            let show_item = MenuItemBuilder::with_id("show", "Show Ember Bridge").build(app)?;
+            let autostart_item = CheckMenuItemBuilder::with_id("autostart", "Launch at login")
+                .checked(app.autolaunch().is_enabled().unwrap_or(false))
+                .build(app)?;
+            let quit_item = MenuItemBuilder::with_id("quit", "Quit Ember Bridge").build(app)?;
+            let menu = MenuBuilder::new(app)
+                .item(&show_item)
+                .separator()
+                .item(&autostart_item)
+                .separator()
+                .item(&quit_item)
+                .build()?;
+
+            let autostart_check = autostart_item.clone();
+            let mut tray = TrayIconBuilder::with_id("main")
+                .tooltip("Ember Bridge")
+                .menu(&menu)
+                // Left-click shows the window (handled below); the menu opens
+                // on right-click only.
+                .show_menu_on_left_click(false)
+                .on_menu_event(move |app, event| match event.id().as_ref() {
+                    "show" => show_main_window(app),
+                    "quit" => app.exit(0),
+                    "autostart" => {
+                        let manager = app.autolaunch();
+                        let was_enabled = manager.is_enabled().unwrap_or(false);
+                        let result = if was_enabled {
+                            manager.disable()
+                        } else {
+                            manager.enable()
+                        };
+                        match result {
+                            // Keep the checkmark in sync with the real state
+                            // (the OS operation, not the menu's optimistic flip).
+                            Ok(()) => {
+                                let _ = autostart_check.set_checked(!was_enabled);
+                            }
+                            Err(e) => {
+                                tracing::warn!("could not toggle launch-at-login: {e}");
+                                let _ = autostart_check.set_checked(was_enabled);
+                            }
+                        }
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        show_main_window(tray.app_handle());
+                    }
+                });
+            if let Some(icon) = app.default_window_icon().cloned() {
+                tray = tray.icon(icon);
+            }
+            tray.build(app)?;
+
+            // Closing the window hides it to the tray instead of quitting; the
+            // only true exit is the tray's Quit item (or Cmd+Q on macOS).
+            if let Some(window) = app.get_webview_window("main") {
+                let hide_target = window.clone();
+                window.on_window_event(move |event| {
+                    if let WindowEvent::CloseRequested { api, .. } = event {
+                        let _ = hide_target.hide();
+                        api.prevent_close();
+                    }
+                });
+                // Started at login (`--minimized`): begin hidden in the tray.
+                if std::env::args().any(|arg| arg == "--minimized") {
+                    let _ = window.hide();
+                }
+            }
 
             // The Tauri runtime hosts a tokio runtime; the upload worker is
             // spawned from inside it so `tokio::spawn` has a reactor.
