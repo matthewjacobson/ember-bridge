@@ -84,6 +84,11 @@ pub fn run() {
             Some(vec!["--minimized"]),
         ))
         .setup(|app| {
+            // Background bridge: no Dock icon and no app-switcher entry — it
+            // lives in the menu bar and its window is shown on demand.
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             let config_dir = app
                 .path()
                 .app_config_dir()
@@ -158,9 +163,10 @@ pub fn run() {
                         show_main_window(tray.app_handle());
                     }
                 });
-            if let Some(icon) = app.default_window_icon().cloned() {
-                tray = tray.icon(icon);
-            }
+            // Monochrome menu-bar glyph, tinted by macOS for light/dark bars.
+            tray = tray
+                .icon(tauri::include_image!("icons/tray-mono.png"))
+                .icon_as_template(true);
             tray.build(app)?;
 
             // Closing the window hides it to the tray instead of quitting; the
