@@ -1,14 +1,496 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ember Bridge</title>
-  </head>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Ember Bridge: Connect your embroidery machines to the Ember web editor. A lightweight desktop bridge for seamless design transfer over WiFi." />
+  <title>Ember Bridge — Connect Embroidery Machines</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+      background: #FFFFFF;
+      color: #1A1A1A;
+      line-height: 1.6;
+    }
+
+    a {
+      color: #7C3AED;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    a:hover {
+      color: #6D28D9;
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 80px 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .hero-content {
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .logo {
+      font-size: 48px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 56px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      font-size: 20px;
+      color: #6B7280;
+      margin-bottom: 40px;
+      line-height: 1.5;
+    }
+
+    /* Buttons */
+    .button-group {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 80px;
+    }
+
+    .button {
+      padding: 14px 32px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .button-primary {
+      background: #7C3AED;
+      color: white;
+      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+    }
+
+    .button-primary:hover {
+      background: #6D28D9;
+      box-shadow: 0 6px 16px rgba(124, 58, 237, 0.4);
+    }
+
+    .button-secondary {
+      background: #F3F4F6;
+      color: #1A1A1A;
+    }
+
+    .button-secondary:hover {
+      background: #E5E7EB;
+    }
+
+    /* Sections */
+    .section {
+      padding: 80px 20px;
+      border-top: 1px solid #E5E7EB;
+    }
+
+    .section-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section h2 {
+      font-size: 40px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .section-subtitle {
+      font-size: 18px;
+      color: #6B7280;
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 60px;
+    }
+
+    /* Features Grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 40px;
+      margin-bottom: 40px;
+    }
+
+    .feature-card {
+      padding: 32px;
+      background: #FAFAFA;
+      border-radius: 8px;
+      border: 1px solid #E5E7EB;
+    }
+
+    .feature-card h3 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .feature-card p {
+      font-size: 16px;
+      color: #6B7280;
+      line-height: 1.6;
+    }
+
+    /* Download Section */
+    .download-section {
+      display: flex;
+      gap: 40px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .download-info {
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .download-info p {
+      font-size: 16px;
+      color: #6B7280;
+      margin-bottom: 20px;
+      line-height: 1.7;
+    }
+
+    .download-box {
+      background: #FAFAFA;
+      border-radius: 8px;
+      border: 1px solid #E5E7EB;
+      padding: 40px;
+      flex: 1;
+      min-width: 300px;
+      text-align: center;
+    }
+
+    .detected-os {
+      font-size: 14px;
+      color: #6B7280;
+      margin-bottom: 12px;
+    }
+
+    .download-button {
+      width: 100%;
+      padding: 16px;
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+
+    .alt-downloads {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #E5E7EB;
+    }
+
+    .alt-downloads p {
+      font-size: 14px;
+      color: #6B7280;
+      margin-bottom: 12px;
+    }
+
+    .download-links {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .download-links a {
+      font-size: 14px;
+      color: #7C3AED;
+    }
+
+    /* Manual Section */
+    .manual-section {
+      background: #FAFAFA;
+    }
+
+    .manual-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: center;
+    }
+
+    .manual-text h3 {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .manual-text p {
+      font-size: 16px;
+      color: #6B7280;
+      margin-bottom: 20px;
+      line-height: 1.7;
+    }
+
+    .manual-chapters {
+      background: white;
+      border: 1px solid #E5E7EB;
+      border-radius: 8px;
+      padding: 24px;
+    }
+
+    .manual-chapters h4 {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #6B7280;
+      margin-bottom: 16px;
+    }
+
+    .manual-chapters ul {
+      list-style: none;
+    }
+
+    .manual-chapters li {
+      padding: 8px 0;
+      font-size: 14px;
+    }
+
+    .manual-chapters a {
+      color: #7C3AED;
+      font-weight: 500;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 40px;
+      }
+
+      .subtitle {
+        font-size: 18px;
+      }
+
+      .section h2 {
+        font-size: 32px;
+      }
+
+      .button-group {
+        flex-direction: column;
+      }
+
+      .button {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .download-section {
+        gap: 20px;
+      }
+
+      .manual-content {
+        grid-template-columns: 1fr;
+        gap: 40px;
+      }
+
+      .hero,
+      .section {
+        padding: 60px 20px;
+      }
+    }
+
+    /* Footer */
+    footer {
+      padding: 40px 20px;
+      background: #FAFAFA;
+      border-top: 1px solid #E5E7EB;
+      text-align: center;
+      color: #6B7280;
+      font-size: 14px;
+    }
+
+    footer a {
+      margin: 0 8px;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Hero Section -->
+  <div class="hero">
+    <div class="hero-content">
+      <div class="logo">🧵</div>
+      <h1>Ember Bridge</h1>
+      <p class="subtitle">Connect your embroidery machines to the Ember web editor. A lightweight desktop bridge for seamless design transfer over WiFi.</p>
+
+      <div class="button-group">
+        <button class="button button-primary" onclick="scrollToDownload()">Download Now</button>
+        <a href="/docs/" class="button button-secondary">View Manual</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Features Section -->
+  <div class="section">
+    <div class="section-inner">
+      <h2>What It Does</h2>
+      <p class="section-subtitle">Ember Bridge is a local bridge between the Ember web embroidery editor and your WiFi-enabled embroidery machine.</p>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <h3>Design to Machine</h3>
+          <p>Send your embroidery designs directly from Ember to your connected machine over your local WiFi network.</p>
+        </div>
+
+        <div class="feature-card">
+          <h3>Local-Only</h3>
+          <p>Everything runs locally on your computer. Your designs stay on your machine. No cloud, no delays, no tracking.</p>
+        </div>
+
+        <div class="feature-card">
+          <h3>Find Machines</h3>
+          <p>Automatically discovers supported embroidery machines on your network via mDNS, so setup is effortless.</p>
+        </div>
+
+        <div class="feature-card">
+          <h3>Manage Designs</h3>
+          <p>Browse, upload, and manage design files directly on your EmberConnect dongle or machine storage.</p>
+        </div>
+
+        <div class="feature-card">
+          <h3>Monitor Progress</h3>
+          <p>Check live machine status, view pending uploads, and troubleshoot issues right from the app.</p>
+        </div>
+
+        <div class="feature-card">
+          <h3>Launch at Startup</h3>
+          <p>Run Ember Bridge as a background service on macOS with launch-on-login and a discreet menu-bar icon.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Download Section -->
+  <div class="section" id="download">
+    <div class="section-inner">
+      <h2>Download Ember Bridge</h2>
+      <p class="section-subtitle">Latest Release: v0.4.0</p>
+
+      <div class="download-section">
+        <div class="download-info">
+          <p><strong>Ember Bridge</strong> runs on macOS, Windows, and Linux. Download the installer for your system below.</p>
+          <p>The app requires a local WiFi network and a supported embroidery machine or EmberConnect dongle to function.</p>
+          <p><strong>Free and open source.</strong> Contributions welcome on <a href="https://github.com/matthewjacobson/ember-bridge">GitHub</a>.</p>
+        </div>
+
+        <div class="download-box">
+          <div class="detected-os">Detected: <span id="detected-os">Detecting...</span></div>
+          <button class="button button-primary download-button" id="auto-download" onclick="triggerDownload()">
+            Download for <span id="os-name">Your System</span>
+          </button>
+
+          <div class="alt-downloads">
+            <p>Other platforms:</p>
+            <div class="download-links">
+              <a href="https://github.com/matthewjacobson/ember-bridge/releases/download/v0.4.0/Ember.Bridge_0.4.0_universal.dmg" download>macOS (Universal DMG)</a>
+              <a href="https://github.com/matthewjacobson/ember-bridge/releases/download/v0.4.0/Ember.Bridge_0.4.0_x64-setup.exe" download>Windows (Installer)</a>
+              <a href="https://github.com/matthewjacobson/ember-bridge/releases/download/v0.4.0/Ember.Bridge_0.4.0_x64_en-US.msi" download>Windows (MSI)</a>
+              <a href="https://github.com/matthewjacobson/ember-bridge/releases/download/v0.4.0/Ember.Bridge_0.4.0_amd64.AppImage" download>Linux (AppImage)</a>
+              <a href="https://github.com/matthewjacobson/ember-bridge/releases/download/v0.4.0/Ember.Bridge_0.4.0_amd64.deb" download>Linux (Debian/Ubuntu)</a>
+              <a href="https://github.com/matthewjacobson/ember-bridge/releases/download/v0.4.0/Ember.Bridge-0.4.0-1.x86_64.rpm" download>Linux (Fedora/RHEL)</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manual Section -->
+  <div class="section manual-section">
+    <div class="section-inner">
+      <div class="manual-content">
+        <div class="manual-text">
+          <h3>User Manual</h3>
+          <p>Get started with Ember Bridge in minutes. Our comprehensive guide covers everything from initial setup to troubleshooting.</p>
+          <p>The manual is included in the app under the <strong>Help</strong> tab, or read it online in the docs.</p>
+        </div>
+
+        <div class="manual-chapters">
+          <h4>Documentation</h4>
+          <ul>
+            <li><a href="/docs/getting-started.md">Getting started</a></li>
+            <li><a href="/docs/connecting-ember.md">Connecting Ember</a></li>
+            <li><a href="/docs/adding-machines.md">Adding machines</a></li>
+            <li><a href="/docs/dongle-setup.md">Setting up a dongle</a></li>
+            <li><a href="/docs/sending-designs.md">Sending a design</a></li>
+            <li><a href="/docs/troubleshooting.md">Troubleshooting</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>
+      <a href="https://github.com/matthewjacobson/ember-bridge">GitHub</a>
+      ·
+      <a href="https://github.com/matthewjacobson/ember-bridge/issues">Issues</a>
+      ·
+      <a href="https://emberdesign.net/">Ember Editor</a>
+    </p>
+    <p style="margin-top: 16px;">Made with 🧵 by <a href="https://github.com/matthewjacobson">Matt Jacobson</a></p>
+  </footer>
+
+  <script>
+    function detectOS() {
+      const ua = navigator.userAgent;
+      let os = "Windows";
+      let osDisplay = "Windows";
+      let downloadUrl = "https://github.com/matthewjacobson/ember-bridge/releases/download/v0.4.0/Ember.Bridge_0.4.0_x64-setup.exe";
+
+      if (ua.includes("Mac")) {
+        os = "macOS";
+        osDisplay = "macOS";
+        downloadUrl = "https://github.com/matthewjacobson/ember-bridge/releases/download/v0.4.0/Ember.Bridge_0.4.0_universal.dmg";
+      } else if (ua.includes("Linux")) {
+        os = "Linux";
+        osDisplay = "Linux";
+        downloadUrl = "https://github.com/matthewjacobson/ember-bridge/releases/download/v0.4.0/Ember.Bridge_0.4.0_amd64.AppImage";
+      }
+
+      document.getElementById("detected-os").textContent = osDisplay;
+      document.getElementById("os-name").textContent = osDisplay;
+      document.getElementById("auto-download").href = downloadUrl;
+
+      return downloadUrl;
+    }
+
+    function triggerDownload() {
+      const url = detectOS();
+      window.location.href = url;
+    }
+
+    function scrollToDownload() {
+      document.getElementById("download").scrollIntoView({ behavior: "smooth" });
+    }
+
+    // Detect OS on page load
+    detectOS();
+  </script>
+</body>
 </html>
