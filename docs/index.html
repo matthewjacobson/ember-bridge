@@ -398,7 +398,13 @@
 
       // Update active link
       document.querySelectorAll('.doc-link').forEach(el => el.classList.remove('active'));
-      event?.target.classList.add('active');
+      if (event?.target) {
+        event.target.classList.add('active');
+      } else {
+        // If no event, find and highlight the link by docId
+        const link = document.querySelector(`[href="#${docId}"]`);
+        if (link) link.classList.add('active');
+      }
 
       const contentDiv = document.getElementById('doc-content');
       contentDiv.className = 'loading';
@@ -418,8 +424,10 @@
       }
     }
 
-    // Load first doc on page load
-    loadDoc('getting-started');
+    // Load doc from URL hash, or default to getting-started
+    const hash = window.location.hash.slice(1);
+    const initialDoc = hash && DOCS[hash] ? hash : 'getting-started';
+    loadDoc(initialDoc);
   </script>
 </body>
 </html>
