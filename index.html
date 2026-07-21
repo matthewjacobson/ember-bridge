@@ -339,7 +339,7 @@
 
       <div class="button-group">
         <button class="button button-primary" onclick="scrollToDownload()">Download Now</button>
-        <a href="/docs/" class="button button-secondary">View Manual</a>
+        <a href="docs/" class="button button-secondary">View Manual</a>
       </div>
     </div>
   </div>
@@ -430,14 +430,14 @@
         </div>
 
         <div class="manual-chapters">
-          <h4>Documentation</h4>
+          <h4>Documentation Chapters</h4>
           <ul>
-            <li><a href="/docs/getting-started.md">Getting started</a></li>
-            <li><a href="/docs/connecting-ember.md">Connecting Ember</a></li>
-            <li><a href="/docs/adding-machines.md">Adding machines</a></li>
-            <li><a href="/docs/dongle-setup.md">Setting up a dongle</a></li>
-            <li><a href="/docs/sending-designs.md">Sending a design</a></li>
-            <li><a href="/docs/troubleshooting.md">Troubleshooting</a></li>
+            <li><a href="/docs/#getting-started" onclick="navigateToDocs('getting-started')">Getting started</a></li>
+            <li><a href="/docs/#connecting-ember" onclick="navigateToDocs('connecting-ember')">Connecting Ember</a></li>
+            <li><a href="/docs/#adding-machines" onclick="navigateToDocs('adding-machines')">Adding machines</a></li>
+            <li><a href="/docs/#dongle-setup" onclick="navigateToDocs('dongle-setup')">Setting up a dongle</a></li>
+            <li><a href="/docs/#sending-designs" onclick="navigateToDocs('sending-designs')">Sending a design</a></li>
+            <li><a href="/docs/#troubleshooting" onclick="navigateToDocs('troubleshooting')">Troubleshooting</a></li>
           </ul>
         </div>
       </div>
@@ -487,6 +487,10 @@
 
     function scrollToDownload() {
       document.getElementById("download").scrollIntoView({ behavior: "smooth" });
+    }
+
+    function navigateToDocs(chapter) {
+      window.location.href = `/docs/#${chapter}`;
     }
 
     // Detect OS on page load
