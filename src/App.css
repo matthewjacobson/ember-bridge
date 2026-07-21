@@ -561,3 +561,156 @@ textarea {
 .boot-error {
   padding: 40px;
 }
+
+/* ---- help / manual -------------------------------------------------------- */
+
+.help-page {
+  display: flex;
+  gap: 24px;
+  padding: 20px 24px 40px;
+  max-width: 960px;
+}
+
+.help-toc {
+  flex: 0 0 172px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 20px;
+  align-self: flex-start;
+}
+
+.help-toc-item {
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  padding: 7px 10px;
+  border-radius: 6px;
+}
+
+.help-toc-item:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: transparent;
+  color: var(--text);
+}
+
+.help-toc-item.active {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.help-content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- rendered markdown ---------------------------------------------------- */
+
+.markdown {
+  user-select: text;
+  line-height: 1.6;
+  max-width: 680px;
+}
+
+.markdown h1 {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 16px;
+}
+
+.markdown h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 28px 0 8px;
+}
+
+.markdown h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 20px 0 6px;
+}
+
+.markdown p {
+  margin: 0 0 12px;
+}
+
+.markdown ul,
+.markdown ol {
+  margin: 0 0 12px;
+  padding-left: 22px;
+}
+
+.markdown li {
+  margin: 4px 0;
+}
+
+.markdown a {
+  color: var(--accent);
+}
+
+.markdown code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.88em;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.markdown pre {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 0 0 12px;
+}
+
+.markdown pre code {
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.markdown blockquote {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  color: var(--text);
+}
+
+.markdown blockquote p {
+  margin: 0;
+}
+
+.markdown hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 24px 0;
+}
+
+.markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 14px;
+  font-size: 13px;
+}
+
+.markdown th,
+.markdown td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.markdown th {
+  background: var(--bg-raised);
+  font-weight: 600;
+}

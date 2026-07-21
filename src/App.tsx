@@ -15,15 +15,17 @@ import { SetupPage } from "./pages/SetupPage";
 import { SendPage } from "./pages/SendPage";
 import { LogsPage } from "./pages/LogsPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { HelpPage } from "./pages/HelpPage";
 import "./App.css";
 
-type Page = "machines" | "setup" | "send" | "logs" | "settings";
+type Page = "machines" | "setup" | "send" | "logs" | "settings" | "help";
 
 const PAGES: { id: Page; label: string }[] = [
   { id: "machines", label: "Machines" },
   { id: "send", label: "Send" },
   { id: "logs", label: "Logs" },
   { id: "settings", label: "Settings" },
+  { id: "help", label: "Help" },
 ];
 
 /**
@@ -139,6 +141,7 @@ function Shell() {
         {page === "send" && <SendPage />}
         {page === "logs" && <LogsPage />}
         {page === "settings" && <SettingsPage />}
+        {page === "help" && <HelpPage />}
       </main>
     </div>
   );
