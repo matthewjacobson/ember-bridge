@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ember Bridge — Documentation</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+      background: #FAFAFA;
+      color: #1A1A1A;
+      line-height: 1.6;
+    }
+
+    .container {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      min-height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      background: #FFFFFF;
+      border-right: 1px solid #E5E7EB;
+      padding: 32px 20px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .sidebar h1 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sidebar a {
+      display: block;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      border-radius: 6px;
+      color: #6B7280;
+      text-decoration: none;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .sidebar a:hover {
+      background: #F3F4F6;
+      color: #7C3AED;
+    }
+
+    .sidebar a.active {
+      background: #EDE9FE;
+      color: #7C3AED;
+      font-weight: 600;
+    }
+
+    .sidebar .back-link {
+      font-size: 12px;
+      color: #9CA3AF;
+      margin-bottom: 20px;
+      padding: 8px 0;
+    }
+
+    /* Main Content */
+    .content {
+      padding: 40px;
+      overflow-y: auto;
+    }
+
+    .content-inner {
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    /* Markdown Styles */
+    .markdown {
+      background: #FFFFFF;
+      border-radius: 8px;
+      padding: 40px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .markdown h1 {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 24px;
+    }
+
+    .markdown h2 {
+      font-size: 28px;
+      font-weight: 600;
+      margin-top: 32px;
+      margin-bottom: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #E5E7EB;
+    }
+
+    .markdown h3 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-top: 24px;
+      margin-bottom: 12px;
+    }
+
+    .markdown p {
+      margin-bottom: 16px;
+      line-height: 1.7;
+    }
+
+    .markdown a {
+      color: #7C3AED;
+      font-weight: 500;
+      text-decoration: underline;
+    }
+
+    .markdown a:hover {
+      color: #6D28D9;
+    }
+
+    .markdown strong {
+      font-weight: 600;
+    }
+
+    .markdown em {
+      font-style: italic;
+    }
+
+    .markdown code {
+      background: #F3F4F6;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: "Monaco", "Courier New", monospace;
+      font-size: 14px;
+      color: #7C3AED;
+    }
+
+    .markdown pre {
+      background: #1F2937;
+      color: #F3F4F6;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      overflow-x: auto;
+    }
+
+    .markdown pre code {
+      background: none;
+      color: inherit;
+      padding: 0;
+    }
+
+    .markdown ul,
+    .markdown ol {
+      margin-left: 24px;
+      margin-bottom: 16px;
+    }
+
+    .markdown li {
+      margin-bottom: 8px;
+    }
+
+    .markdown blockquote {
+      border-left: 4px solid #7C3AED;
+      padding-left: 16px;
+      margin: 16px 0;
+      color: #6B7280;
+      font-style: italic;
+    }
+
+    .markdown table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+      border: 1px solid #E5E7EB;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .markdown th {
+      background: #F3F4F6;
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 1px solid #E5E7EB;
+    }
+
+    .markdown td {
+      padding: 12px;
+      border-bottom: 1px solid #E5E7EB;
+    }
+
+    .markdown tr:last-child td {
+      border-bottom: none;
+    }
+
+    .markdown hr {
+      border: none;
+      border-top: 1px solid #E5E7EB;
+      margin: 32px 0;
+    }
+
+    /* Loading state */
+    .loading {
+      padding: 40px;
+      text-align: center;
+      color: #6B7280;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: relative;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid #E5E7EB;
+        padding: 20px;
+      }
+
+      .content {
+        padding: 20px;
+      }
+
+      .markdown {
+        padding: 20px;
+      }
+
+      .markdown h1 {
+        font-size: 28px;
+      }
+
+      .markdown h2 {
+        font-size: 22px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <aside class="sidebar">
+      <div class="back-link"><a href="/">← Back to Ember Bridge</a></div>
+      <h1>📖 Documentation</h1>
+      <a href="#getting-started" class="doc-link active" onclick="loadDoc('getting-started', event)">Getting started</a>
+      <a href="#connecting-ember" class="doc-link" onclick="loadDoc('connecting-ember', event)">Connecting Ember</a>
+      <a href="#adding-machines" class="doc-link" onclick="loadDoc('adding-machines', event)">Adding machines</a>
+      <a href="#dongle-setup" class="doc-link" onclick="loadDoc('dongle-setup', event)">Setting up a dongle</a>
+      <a href="#sending-designs" class="doc-link" onclick="loadDoc('sending-designs', event)">Sending a design</a>
+      <a href="#troubleshooting" class="doc-link" onclick="loadDoc('troubleshooting', event)">Troubleshooting</a>
+    </aside>
+
+    <main class="content">
+      <div class="content-inner">
+        <div id="doc-content" class="loading">Loading documentation...</div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const DOCS = {
+      'getting-started': 'getting-started.md',
+      'connecting-ember': 'connecting-ember.md',
+      'adding-machines': 'adding-machines.md',
+      'dongle-setup': 'dongle-setup.md',
+      'sending-designs': 'sending-designs.md',
+      'troubleshooting': 'troubleshooting.md',
+    };
+
+    function parseMarkdown(md) {
+      const lines = md.replace(/\r\n/g, '\n').split('\n');
+      let html = '';
+      let i = 0;
+      let inCodeBlock = false;
+      let codeBuffer = [];
+
+      while (i < lines.length) {
+        const line = lines[i];
+
+        // Code blocks
+        if (line.startsWith('```')) {
+          if (inCodeBlock) {
+            html += `<pre><code>${escapeHtml(codeBuffer.join('\n'))}</code></pre>`;
+            codeBuffer = [];
+            inCodeBlock = false;
+          } else {
+            inCodeBlock = true;
+            codeBuffer = [];
+          }
+          i++;
+          continue;
+        }
+
+        if (inCodeBlock) {
+          codeBuffer.push(line);
+          i++;
+          continue;
+        }
+
+        // Headings
+        const h = line.match(/^(#{1,3})\s+(.*)$/);
+        if (h) {
+          const tag = `h${h[1].length}`;
+          html += `<${tag}>${escapeHtml(h[2])}</${tag}>`;
+          i++;
+          continue;
+        }
+
+        // Horizontal rule
+        if (/^---+$/.test(line.trim())) {
+          html += '<hr>';
+          i++;
+          continue;
+        }
+
+        // Blockquote
+        if (line.startsWith('>')) {
+          const buf = [];
+          while (i < lines.length && lines[i].startsWith('>')) {
+            buf.push(lines[i].replace(/^>\s?/, ''));
+            i++;
+          }
+          html += `<blockquote>${renderInlineMarkdown(buf.join(' '))}</blockquote>`;
+          continue;
+        }
+
+        // Lists (simplified)
+        if (/^\s*[-*]\s+/.test(line)) {
+          const buf = [];
+          while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
+            buf.push(lines[i].replace(/^\s*[-*]\s+/, ''));
+            i++;
+          }
+          html += `<ul>${buf.map(item => `<li>${renderInlineMarkdown(item)}</li>`).join('')}</ul>`;
+          continue;
+        }
+
+        if (/^\s*\d+\.\s+/.test(line)) {
+          const buf = [];
+          while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+            buf.push(lines[i].replace(/^\s*\d+\.\s+/, ''));
+            i++;
+          }
+          html += `<ol>${buf.map(item => `<li>${renderInlineMarkdown(item)}</li>`).join('')}</ol>`;
+          continue;
+        }
+
+        // Paragraphs
+        if (line.trim() === '') {
+          i++;
+          continue;
+        }
+
+        html += `<p>${renderInlineMarkdown(line)}</p>`;
+        i++;
+      }
+
+      return html;
+    }
+
+    function renderInlineMarkdown(text) {
+      return text
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>');
+    }
+
+    function escapeHtml(text) {
+      const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;',
+      };
+      return text.replace(/[&<>"']/g, m => map[m]);
+    }
+
+    async function loadDoc(docId, event) {
+      if (event) event.preventDefault();
+
+      const filename = DOCS[docId];
+      if (!filename) return;
+
+      // Update active link
+      document.querySelectorAll('.doc-link').forEach(el => el.classList.remove('active'));
+      event?.target.classList.add('active');
+
+      const contentDiv = document.getElementById('doc-content');
+      contentDiv.className = 'loading';
+      contentDiv.textContent = 'Loading...';
+
+      try {
+        const response = await fetch(filename);
+        if (!response.ok) throw new Error('Not found');
+
+        const md = await response.text();
+        const html = parseMarkdown(md);
+        contentDiv.className = 'markdown';
+        contentDiv.innerHTML = html;
+      } catch (err) {
+        contentDiv.className = 'loading';
+        contentDiv.textContent = `Error loading ${docId}: ${err.message}`;
+      }
+    }
+
+    // Load first doc on page load
+    loadDoc('getting-started');
+  </script>
+</body>
+</html>
